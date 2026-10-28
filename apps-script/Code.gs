@@ -90,8 +90,14 @@ function makePdf(d) {
 }
 
 function getFolder() {
-  const parents = DriveApp.getFileById(SHEET_ID).getParents();
-  const base = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  // 시트가 있는 폴더를 찾고, 권한 문제로 못 찾으면 내 드라이브 첫 화면에 폴더를 만든다
+  let base;
+  try {
+    const parents = DriveApp.getFileById(SHEET_ID).getParents();
+    base = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+  } catch (e) {
+    base = DriveApp.getRootFolder();
+  }
   const it = base.getFoldersByName(PDF_FOLDER);
   return it.hasNext() ? it.next() : base.createFolder(PDF_FOLDER);
 }
@@ -235,6 +241,15 @@ function lookupDb(phone, name) {
     return { ok: true, found: true, db: String(row[cDb]).replace(/[^\p{L}\p{N}\s\/()·,.~-]/gu, '').trim(), name: String(row[cName]).trim(), submittedAt: String(row[cAt]), fields: fields };
   }
   return { ok: true, found: false };
+}
+
+// 편집기에서 한 번 실행해 시트와 드라이브 권한을 모두 승인받는 용도
+function authorize() {
+  SpreadsheetApp.openById(SHEET_ID).getName();
+  SpreadsheetApp.openById(DB_SHEET_ID).getName();
+  DriveApp.getRootFolder().getName();
+  DriveApp.getFileById(SHEET_ID).getName();
+  Logger.log('권한 승인 완료');
 }
 
 // 편집기에서 직접 실행해 시트에 테스트 한 줄과 PDF가 생기는지 확인용
