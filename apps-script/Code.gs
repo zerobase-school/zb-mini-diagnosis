@@ -396,7 +396,6 @@ function sheetHtml(d, r) {
     '<td style="width:66%;vertical-align:top;padding-right:12px;border-right:1px solid #ccc">' + left + '</td>' +
     '<td style="width:34%;vertical-align:top;padding-left:12px">' + right + '</td></tr></table>' +
     '<div style="border-top:1px solid #ccc;margin-top:10px;padding-top:4px;font-size:8px;color:' + INK3 + '">본 결과지는 12개 자가 응답 문항으로 산출한 참고용 진단임. 고객 화면에는 유형까지만 공개. 응답 ID ' + esc(d['응답 ID'] || '-') + '  |  Copyright ZEROBASE</div>' +
-    page2 +
     '</body></html>';
 }
 
