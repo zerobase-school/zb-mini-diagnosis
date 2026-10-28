@@ -48,24 +48,14 @@ body {
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; -webkit-tap-highlight-color: transparent; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); outline-offset: 2px; }
 
-/* desktop frame */
-.layout { display: grid; justify-content: center; }
-.side { display: none; }
-@media (min-width: 960px) {
-  .layout { grid-template-columns: minmax(0, 400px) 420px; gap: 80px; align-items: center; padding: 40px 32px; position: relative; overflow: hidden; min-height: 100vh; }
-  .layout::before { content: ""; position: absolute; width: 720px; height: 720px; border-radius: 50%; border: 110px solid var(--lav-2); left: -300px; top: -300px; opacity: .8; z-index: 0; }
-  .side { display: grid; gap: 20px; z-index: 1; }
-  .side h2 { margin: 0; font-size: 40px; line-height: 1.25; font-weight: 800; letter-spacing: -0.04em; text-wrap: balance; }
-  .side p { margin: 0; color: var(--ink-2); font-size: 16px; }
-  .side ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; counter-reset: s; }
-  .side li { counter-increment: s; display: flex; gap: 12px; align-items: center; color: var(--ink-2); font-weight: 500; }
-  .side li::before { content: counter(s); width: 26px; height: 26px; border-radius: 50%; background: var(--card); box-shadow: var(--shadow); color: var(--navy); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
-  .side .hint { font-size: 13px; color: var(--ink-3); }
-  .app { border-radius: 40px; box-shadow: 0 40px 90px rgba(29, 36, 131, .18), 0 0 0 9px var(--card), 0 0 0 10px var(--line); overflow: hidden; z-index: 1; height: 860px; overflow-y: auto; scrollbar-width: none; }
-  .app::-webkit-scrollbar { display: none; }
-}
+/* web: 가운데 폼 한 줄만 */
+.layout { display: block; }
+.side { display: none !important; }
 .app { position: relative; background: var(--bg); width: 100%; max-width: 440px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
-@media (min-width: 960px) { .app { min-height: 0; } }
+@media (min-width: 600px) {
+  html, body { background: #ebecf2; }
+  .app { max-width: 520px; box-shadow: 0 0 0 1px var(--line), 0 0 40px rgba(29, 36, 131, .06); }
+}
 
 /* app bar */
 .appbar { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--card) 86%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px); padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 12px; display: flex; align-items: center; gap: 10px; }
@@ -400,18 +390,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 </style>
 
 <div class="layout">
-  <aside class="side">
-    <span class="logo" aria-label="제로베이스">제<i></i>베</span>
-    <h2>취업/이직 미니 진단</h2>
-    <p>상담을 예약한 고객에게 발송해, 제로베이스 취업/이직 공식 4개 축으로 점수와 유형을 진단하고 상담에서 해설할 결과지를 미리 받아보게 하는 시연 화면이에요.</p>
-    <ol>
-      <li>앞서 제출한 응답 요약 확인</li>
-      <li>가장 큰 고민 선택 후 공식 4개 축 심층 12문항</li>
-      <li>4글자 유형과 추천 서비스 확인</li>
-      <li>예약한 상담에서 결과지 해설</li>
-    </ol>
-    <p class="hint">오른쪽 화면 상단의 "시연" 버튼으로 예시 응답을 채울 수 있어요.</p>
-  </aside>
+
 
   <div class="app" id="app-shell">
     <header class="appbar">
