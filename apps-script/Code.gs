@@ -225,7 +225,7 @@ const AXIS_STRATEGY = {
 
 /* 검사지형 결과지 (InBody 결과지처럼 한 장에 수치와 막대를 촘촘히) */
 function sheetHtml(d, r) {
-  const INK = '#111', INK2 = '#444', INK3 = '#888', LINE = '#9a9a9a', HEAD = '#e3e3e3', SEG = '#ededed', NAVY = '#14206b', RED = '#b3263e';
+  const INK = '#111', INK2 = '#444', INK3 = '#888', LINE = '#c4c4c4', HEAD = '#e3e3e3', SEG = '#ededed', NAVY = '#14206b', RED = '#b3263e';
   const F = "font-family:'Noto Sans KR','Noto Sans CJK KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;";
   const T = 'width:100%;border-collapse:collapse;';
   const w = r.axes[0];
@@ -243,13 +243,13 @@ function sheetHtml(d, r) {
     let cells = '';
     for (let i = 0; i < 20; i++) {
       const v = i * 5, lab = (v % 10 === 0) ? v : '';
-      cells += '<td style="width:5%;font-size:7.5px;color:' + INK3 + ';text-align:left;padding:0;border-left:' + (v % 10 === 0 ? '1px solid #bbb' : '0') + '">' + lab + '</td>';
+      cells += '<td style="width:5%;font-size:7.5px;color:' + INK3 + ';text-align:left;padding:0;border-left:' + (v % 10 === 0 ? '0.5pt solid #cfcfcf' : '0') + '">' + lab + '</td>';
     }
     return cells;
   };
-  const segHead = '<td colspan="9" style="font-size:8px;text-align:center;border:1px solid #bbb;background:#fff;padding:1px 0">보완 필요</td>' +
-    '<td colspan="6" style="font-size:8px;text-align:center;border:1px solid #bbb;background:' + SEG + ';padding:1px 0">표준</td>' +
-    '<td colspan="5" style="font-size:8px;text-align:center;border:1px solid #bbb;background:#fff;padding:1px 0">우수</td>';
+  const segHead = '<td colspan="9" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:#fff;padding:1px 0">보완 필요</td>' +
+    '<td colspan="6" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:' + SEG + ';padding:1px 0">표준</td>' +
+    '<td colspan="5" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:#fff;padding:1px 0">우수</td>';
   const barCells = function (score) {
     let cells = '';
     const s = Math.max(0, Math.min(100, Number(score) || 0));
@@ -258,7 +258,7 @@ function sheetHtml(d, r) {
       cells += '<td style="width:5%;height:7px;padding:0;font-size:1px;line-height:1px;background:' +
         (fill ? (s < 45 ? RED : INK) : (std ? SEG : '#fff')) + '"></td>';
     }
-    return '<td colspan="20" style="padding:4px 0;border-bottom:1px solid #ddd"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
+    return '<td colspan="20" style="padding:4px 0;border-bottom:0.5pt solid #e2e2e2"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
   };
 
   // ---------- 상단 ----------
@@ -267,7 +267,7 @@ function sheetHtml(d, r) {
     '<td style="font-size:30px;font-weight:900;letter-spacing:-1.5px;color:' + INK + '">ZEROBASE</td>' +
     '<td style="text-align:right;vertical-align:bottom;font-size:10px;color:' + INK2 + '">[취업/이직 미니 진단] [취업정보회사]</td>' +
     '<td style="text-align:right;vertical-align:bottom;width:150px;font-size:16px;font-weight:900;color:' + NAVY + '">제로베이스</td></tr></table>' +
-    '<table style="' + T + 'margin-top:4px;border-top:2px solid ' + INK + ';border-bottom:1px solid ' + LINE + '"><tr>' +
+    '<table style="' + T + 'margin-top:4px;border-top:1pt solid ' + INK + ';border-bottom:0.5pt solid ' + LINE + '"><tr>' +
     ['이름', '구분', '연차', '신청 DB', '검사일시'].map(function (h) { return '<td style="font-size:8.5px;color:' + INK2 + ';padding:3px 5px 0">' + h + '</td>'; }).join('') + '</tr><tr>' +
     [d['이름'], r.track, r.stage, r.db || '-', d['제출일시']].map(function (v) { return '<td style="font-size:11px;font-weight:700;padding:0 5px 4px">' + esc(v) + '</td>'; }).join('') +
     '</tr></table>';
@@ -275,16 +275,16 @@ function sheetHtml(d, r) {
   // ---------- 왼쪽 ----------
   // 1) 취업/이직 공식 분석 표
   const formula = band('취업/이직 공식 분석', 'Career Formula Analysis') +
-    '<table style="' + T + 'border:1px solid ' + LINE + '"><tr>' +
-    '<td style="width:24%;border:1px solid ' + LINE + '"></td>' +
-    ['측정값', '기준 범위', '판정', '유형 글자'].map(function (h) { return '<td style="border:1px solid ' + LINE + ';background:#f6f6f6;font-size:9px;text-align:center;padding:2px">' + h + '</td>'; }).join('') + '</tr>' +
+    '<table style="' + T + 'border:0.5pt solid ' + LINE + '"><tr>' +
+    '<td style="width:24%;border:0.5pt solid ' + LINE + '"></td>' +
+    ['측정값', '기준 범위', '판정', '유형 글자'].map(function (h) { return '<td style="border:0.5pt solid ' + LINE + ';background:#f6f6f6;font-size:9px;text-align:center;padding:2px">' + h + '</td>'; }).join('') + '</tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
-      return '<tr><td style="border:1px solid ' + LINE + ';padding:3px 6px;font-size:11px;font-weight:700">' + esc(n) + '</td>' +
-        '<td style="border:1px solid ' + LINE + ';text-align:center;font-size:13px;font-weight:700;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td>' +
-        '<td style="border:1px solid ' + LINE + ';text-align:center;font-size:9.5px;color:' + INK2 + '">(45.0 ~ 74.0)</td>' +
-        '<td style="border:1px solid ' + LINE + ';text-align:center;font-size:10px">' + esc(a.verdict) + '</td>' +
-        '<td style="border:1px solid ' + LINE + ';text-align:center;font-size:10px">' + esc(a.side) + '</td></tr>';
+      return '<tr><td style="border:0.5pt solid ' + LINE + ';padding:3px 6px;font-size:11px;font-weight:700">' + esc(n) + '</td>' +
+        '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:13px;font-weight:700;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td>' +
+        '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:9.5px;color:' + INK2 + '">(45.0 ~ 74.0)</td>' +
+        '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:10px">' + esc(a.verdict) + '</td>' +
+        '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:10px">' + esc(a.side) + '</td></tr>';
     }).join('') + '</table>';
 
   // 2) 축별 수준 분석 (눈금 막대)
@@ -293,8 +293,8 @@ function sheetHtml(d, r) {
     '<tr><td></td>' + scaleHead() + '<td></td></tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
-      return '<tr><td style="font-size:10.5px;font-weight:700;padding:4px 4px 4px 0;border-bottom:1px solid #ddd">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
-        barCells(a.score) + '<td style="font-size:10.5px;font-weight:700;padding-left:5px;border-bottom:1px solid #ddd;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td></tr>';
+      return '<tr><td style="font-size:10.5px;font-weight:700;padding:4px 4px 4px 0;border-bottom:0.5pt solid #e2e2e2">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
+        barCells(a.score) + '<td style="font-size:10.5px;font-weight:700;padding-left:5px;border-bottom:0.5pt solid #e2e2e2;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td></tr>';
     }).join('') + '</table>';
 
   // 3) 문항별 응답 분석 (0~3점)
@@ -304,12 +304,12 @@ function sheetHtml(d, r) {
       const s = x.s === null ? 0 : x.s;
       let cells = '';
       for (let k = 0; k < 3; k++) cells += '<td style="height:6px;padding:0;font-size:1px;line-height:1px;border-right:2px solid #fff;background:' + (k < s ? (s <= 1 ? RED : INK) : '#e4e4e4') + '"></td>';
-      cells = '<td colspan="3" style="width:13%;padding:0 4px;border-bottom:1px solid #e3e3e3' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
+      cells = '<td colspan="3" style="width:13%;padding:0 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
       return '<tr>' +
-        (i === 0 ? '<td rowspan="3" style="width:16%;font-size:10px;font-weight:700;border-bottom:1px solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
-        '<td style="font-size:8.5px;line-height:1.3;color:' + INK2 + ';padding:2px 4px;border-bottom:1px solid #e3e3e3' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.q) + '</td>' +
+        (i === 0 ? '<td rowspan="3" style="width:16%;font-size:10px;font-weight:700;border-bottom:0.5pt solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
+        '<td style="font-size:8.5px;line-height:1.3;color:' + INK2 + ';padding:2px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.q) + '</td>' +
         cells + '<td style="width:5%;font-size:9px;text-align:right;padding-right:3px;color:' + (x.s !== null && x.s <= 1 ? RED : INK) + ';font-weight:700">' + (x.s === null ? '-' : x.s) + '</td>' +
-        '<td style="width:24%;font-size:8.5px;line-height:1.3;font-weight:700;padding:2px 4px;border-bottom:1px solid #e3e3e3' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.a) + '</td></tr>';
+        '<td style="width:24%;font-size:8.5px;line-height:1.3;font-weight:700;padding:2px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.a) + '</td></tr>';
     }).join('');
   }).join('');
   const qa = band('문항별 응답 분석', 'Item Response Analysis') +
@@ -318,16 +318,16 @@ function sheetHtml(d, r) {
   // 4) 같은 연차 합격 사례
   const caseBlock = band('같은 연차 합격 사례 (' + esc(r.stage) + ')', 'Placement History') +
     '<table style="' + T + '">' + (cases.length ? cases.slice(0, 3).map(function (c) {
-      return '<tr><td style="font-size:9.5px;font-weight:700;padding:3px 4px 3px 0;border-bottom:1px solid #e3e3e3;width:38%;vertical-align:top">' + esc(c[0]) + '</td>' +
-        '<td style="font-size:9px;color:' + INK2 + ';padding:3px 4px;border-bottom:1px solid #e3e3e3;width:20%;vertical-align:top">' + esc(c[1]) + '</td>' +
-        '<td style="font-size:9px;padding:3px 0 3px 4px;border-bottom:1px solid #e3e3e3;vertical-align:top">' + esc(c[2]) + '</td></tr>';
+      return '<tr><td style="font-size:9.5px;font-weight:700;padding:3px 4px 3px 0;border-bottom:0.5pt solid #e6e6e6;width:38%;vertical-align:top">' + esc(c[0]) + '</td>' +
+        '<td style="font-size:9px;color:' + INK2 + ';padding:3px 4px;border-bottom:0.5pt solid #e6e6e6;width:20%;vertical-align:top">' + esc(c[1]) + '</td>' +
+        '<td style="font-size:9px;padding:3px 0 3px 4px;border-bottom:0.5pt solid #e6e6e6;vertical-align:top">' + esc(c[2]) + '</td></tr>';
     }).join('') : '<tr><td style="font-size:9.5px;color:' + INK2 + '">해당 연차 사례 없음</td></tr>') + '</table>';
 
   const left = top.replace(/^/, '') && (formula + levels + qa + caseBlock);
 
   // ---------- 오른쪽 ----------
   const rbox = function (ko, en, body) {
-    return '<div style="margin-top:9px"><div style="font-size:11px;font-weight:700;border-bottom:1px solid ' + INK + ';padding-bottom:2px">' + ko +
+    return '<div style="margin-top:9px"><div style="font-size:11px;font-weight:700;border-bottom:0.75pt solid ' + INK + ';padding-bottom:2px">' + ko +
       ' <span style="font-size:8px;font-weight:400;color:' + INK2 + ';font-style:italic">' + en + '</span></div><div style="padding-top:4px">' + body + '</div></div>';
   };
   const scoreBox = rbox('진단 점수', 'Diagnosis Score',
@@ -335,7 +335,7 @@ function sheetHtml(d, r) {
     '<div style="font-size:8.5px;color:' + INK2 + '">* 취업/이직 공식 4개 축 점수의 평균. 45점 미만 보완 필요, 75점 이상 우수. 현재 판정: <b>' + esc(r.verdict) + '</b></div>');
   const typeBox = rbox('취업/이직 유형', 'Career Type',
     '<table style="' + T + 'margin:3px 0"><tr>' + String(r.code).split('').map(function (ch) {
-      return '<td style="border:1px solid ' + INK + ';text-align:center;font-size:18px;font-weight:900;padding:3px 0">' + esc(ch) + '</td>';
+      return '<td style="border:0.75pt solid ' + INK + ';text-align:center;font-size:18px;font-weight:900;padding:3px 0">' + esc(ch) + '</td>';
     }).join('<td style="width:4px"></td>') + '</tr></table>' +
     '<div style="font-size:12px;font-weight:700;text-align:center">' + esc(r.typeName) + '</div>' +
     '<table style="' + T + 'margin-top:5px">' + ORDER.map(function (n) {
@@ -372,18 +372,18 @@ function sheetHtml(d, r) {
     '<table style="' + T + 'border-bottom:2px solid ' + INK + '"><tr><td style="font-size:16px;font-weight:900">상담 진행 가이드</td><td style="text-align:right;font-size:9px;color:' + INK2 + '">' + esc(d['이름']) + '님  |  세일즈팀 내부용</td></tr></table>' +
     band('진행 순서', 'Consulting Flow') +
     '<table style="' + T + '">' + steps.map(function (s, i) {
-      return '<tr><td style="width:20px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:1px solid #ddd;vertical-align:top">' + (i + 1) + '</td>' +
-        '<td style="width:80px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:1px solid #ddd;vertical-align:top">' + s[0] + '</td>' +
-        '<td style="font-size:10px;padding:4px 0;border-bottom:1px solid #ddd">' + s[1] + '</td></tr>';
+      return '<tr><td style="width:20px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:0.5pt solid #e2e2e2;vertical-align:top">' + (i + 1) + '</td>' +
+        '<td style="width:80px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:0.5pt solid #e2e2e2;vertical-align:top">' + s[0] + '</td>' +
+        '<td style="font-size:10px;padding:4px 0;border-bottom:0.5pt solid #e2e2e2">' + s[1] + '</td></tr>';
     }).join('') + '</table>' +
     band('확인이 필요한 응답', 'Low Score Items (1점 이하)') +
     '<table style="' + T + '">' + (lowQs.length ? lowQs.map(function (x) {
-      return '<tr><td style="width:90px;font-size:9.5px;color:' + INK2 + ';padding:3px 0;border-bottom:1px solid #e3e3e3">' + esc(x[0]) + '</td><td style="font-size:9.5px;padding:3px 4px;border-bottom:1px solid #e3e3e3">' + esc(x[1]) + '</td><td style="width:150px;font-size:9.5px;font-weight:700;color:' + RED + ';padding:3px 0;border-bottom:1px solid #e3e3e3">' + esc(x[2]) + '</td></tr>';
+      return '<tr><td style="width:90px;font-size:9.5px;color:' + INK2 + ';padding:3px 0;border-bottom:0.5pt solid #e6e6e6">' + esc(x[0]) + '</td><td style="font-size:9.5px;padding:3px 4px;border-bottom:0.5pt solid #e6e6e6">' + esc(x[1]) + '</td><td style="width:150px;font-size:9.5px;font-weight:700;color:' + RED + ';padding:3px 0;border-bottom:0.5pt solid #e6e6e6">' + esc(x[2]) + '</td></tr>';
     }).join('') : '<tr><td style="font-size:9.5px">없음</td></tr>') + '</table>' +
     band('축별 상담 의제', 'Agenda by Axis') +
     '<table style="' + T + '">' + r.axes.map(function (a) {
-      return '<tr><td style="width:90px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:1px solid #ddd;vertical-align:top">' + esc(a.name) + '<div style="font-size:9px;font-weight:400;color:' + (a.score < 45 ? RED : INK2) + '">' + a.score + '점 ' + esc(a.verdict) + '</div></td>' +
-        '<td style="font-size:9.5px;padding:4px 0 4px 6px;border-bottom:1px solid #ddd"><b>진단</b> ' + esc(a.flag) + '<br><b>함께 볼 부분</b> ' + esc(a.point) + '<br><b>상담 의제</b> ' + esc((a.locked || []).join(', ')) + '</td></tr>';
+      return '<tr><td style="width:90px;font-size:10px;font-weight:700;padding:4px 0;border-bottom:0.5pt solid #e2e2e2;vertical-align:top">' + esc(a.name) + '<div style="font-size:9px;font-weight:400;color:' + (a.score < 45 ? RED : INK2) + '">' + a.score + '점 ' + esc(a.verdict) + '</div></td>' +
+        '<td style="font-size:9.5px;padding:4px 0 4px 6px;border-bottom:0.5pt solid #e2e2e2"><b>진단</b> ' + esc(a.flag) + '<br><b>함께 볼 부분</b> ' + esc(a.point) + '<br><b>상담 의제</b> ' + esc((a.locked || []).join(', ')) + '</td></tr>';
     }).join('') + '</table>' +
     band('추천 프로그램 제공 내용', esc(r.plan.name)) +
     '<div style="font-size:9.5px;padding-top:3px">' + (r.plan.items || []).map(esc).join('  |  ') + '</div>';
@@ -393,9 +393,9 @@ function sheetHtml(d, r) {
     '</style></head><body>' +
     top +
     '<table style="' + T + 'margin-top:2px"><tr>' +
-    '<td style="width:66%;vertical-align:top;padding-right:12px;border-right:1px solid #ccc">' + left + '</td>' +
+    '<td style="width:66%;vertical-align:top;padding-right:12px;border-right:0.5pt solid #d5d5d5">' + left + '</td>' +
     '<td style="width:34%;vertical-align:top;padding-left:12px">' + right + '</td></tr></table>' +
-    '<div style="border-top:1px solid #ccc;margin-top:10px;padding-top:4px;font-size:8px;color:' + INK3 + '">본 결과지는 12개 자가 응답 문항으로 산출한 참고용 진단임. 고객 화면에는 유형까지만 공개. 응답 ID ' + esc(d['응답 ID'] || '-') + '  |  Copyright ZEROBASE</div>' +
+    '<div style="border-top:0.5pt solid #d5d5d5;margin-top:10px;padding-top:4px;font-size:8px;color:' + INK3 + '">본 결과지는 12개 자가 응답 문항으로 산출한 참고용 진단임. 고객 화면에는 유형까지만 공개. 응답 ID ' + esc(d['응답 ID'] || '-') + '  |  Copyright ZEROBASE</div>' +
     '</body></html>';
 }
 
