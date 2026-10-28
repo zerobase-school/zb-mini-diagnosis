@@ -54,6 +54,12 @@ function doGet() {
   return json({ ok: true, message: '미니 진단 응답 수집 중' });
 }
 
+// 편집기에서 직접 실행해 시트에 테스트 한 줄이 들어가는지 확인용
+function testWrite() {
+  const res = doPost({ postData: { contents: JSON.stringify({ '제출일시': new Date().toLocaleString('ko-KR'), '이름': '테스트' }) } });
+  Logger.log(res.getContent());
+}
+
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
