@@ -862,7 +862,7 @@ const menu = $("demo-menu"), mbtn = $("demo-btn");
 mbtn.addEventListener("click", () => { menu.hidden = !menu.hidden; mbtn.setAttribute("aria-expanded", !menu.hidden); });
 document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target) && e.target !== mbtn) { menu.hidden = true; mbtn.setAttribute("aria-expanded", "false"); } });
 $("btn-autofill").addEventListener("click", () => { menu.hidden = true; fill(); render(); toast("예시 응답을 채웠어요. 아래 버튼으로 넘기며 시연하세요."); });
-$("btn-jump").addEventListener("click", () => { menu.hidden = true; fill(); go("report"); });
+$("btn-jump").addEventListener("click", () => { menu.hidden = true; fill(); submitRow(); go("report"); });
 $("btn-reset").addEventListener("click", () => { menu.hidden = true; reset(); });
 $("btn-row").addEventListener("click", () => { menu.hidden = true; showRow(); });
 $("row-close").addEventListener("click", () => $("row-panel").hidden = true);

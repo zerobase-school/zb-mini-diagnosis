@@ -15,6 +15,7 @@
  * - 같은 연락처가 다시 제출하면 새 줄로 쌓인다(최신 응답이 아래).
  */
 
+const SHEET_ID = '1YS72FDuRNgBQVu9uD3x_ZZbTTTndEd4Vef1BUha7k7A'; // [취업정보회사] 미니 진단 응답
 const SHEET_INDEX = 0; // 응답을 쌓을 탭 (첫 번째 탭)
 
 function doPost(e) {
@@ -22,7 +23,7 @@ function doPost(e) {
   lock.waitLock(10000);
   try {
     const data = JSON.parse(e.postData.contents);
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[SHEET_INDEX];
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
 
     const lastCol = Math.max(sheet.getLastColumn(), 1);
     const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
