@@ -127,10 +127,26 @@ function makePdf(d, detail) {
   const html = detail ? richHtml(d, detail) : reportHtml(d);
   const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
-  const blob = Utilities.newBlob(html, 'text/html', 'report.html').getAs('application/pdf').setName(name);
+  const blob = htmlToPdf(html).setName(name);
   const file = getFolder().createFile(blob);
   try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
   return file.getUrl();
+}
+
+// HTML을 PDF로 변환
+// Apps Script 편집기에서 서비스 > Drive API 를 추가해 두면 구글 문서를 거쳐 변환해 폰트(Noto Sans KR)가 정확히 나옴
+// 추가하지 않았으면 기본 변환기를 사용
+function htmlToPdf(html) {
+  const src = Utilities.newBlob(html, 'text/html', 'report.html');
+  if (typeof Drive !== 'undefined') {
+    try {
+      const doc = Drive.Files.create({ name: 'tmp_minidiag_' + Date.now(), mimeType: 'application/vnd.google-apps.document' }, src);
+      const pdf = DriveApp.getFileById(doc.id).getAs('application/pdf');
+      DriveApp.getFileById(doc.id).setTrashed(true);
+      return pdf;
+    } catch (e) {}
+  }
+  return src.getAs('application/pdf');
 }
 
 function getFolder() {
@@ -207,112 +223,136 @@ const AXIS_STRATEGY = {
   '실전 준비도': '최신 합격 서류와 내 서류를 비교하고, 기업별 면접 복기 자료로 탈락 패턴과 예상 질문을 대비'
 };
 
-/* 상세 결과지 (세일즈팀 상담 준비용) */
+/* 상세 결과지 (세일즈팀 상담 준비용) — 컨설팅 리포트 톤 */
 function richHtml(d, r) {
-  const NAVY = '#1d2483', NAVY2 = '#3a41c4', LAV = '#eeeefb', INK = '#1a1d2e', INK2 = '#5a5f73', INK3 = '#8a8fa3', LINE = '#e3e4ee', ROSE = '#d23f6a';
-  const cell = 'padding:6px 0;vertical-align:top;';
-  const bar = function (score) {
-    const s = Math.max(0, Math.min(100, Number(score) || 0)), color = s < 45 ? ROSE : NAVY;
-    return '<table style="width:100%;border-collapse:collapse"><tr>' +
-      (s > 0 ? '<td style="width:' + s + '%;height:9px;background:' + color + '"></td>' : '') +
-      (s < 100 ? '<td style="height:9px;background:' + LAV + '"></td>' : '') + '</tr></table>';
-  };
-  const h2 = function (num, t) { return '<div style="margin:22px 0 8px;padding-bottom:5px;border-bottom:2px solid ' + NAVY + ';font-size:14px;font-weight:800;color:' + NAVY + '">' + num + '. ' + t + '</div>'; };
-  const kv = function (k, v, strong) { return v ? '<tr><td style="' + cell + 'color:' + INK2 + ';width:120px">' + k + '</td><td style="' + cell + (strong ? 'font-weight:800;color:' + NAVY : 'font-weight:600') + '">' + v + '</td></tr>' : ''; };
-  const list = function (arr) { return '<ul style="margin:4px 0 0 16px;padding:0">' + arr.map(function (x) { return '<li style="margin:2px 0">' + esc(x) + '</li>'; }).join('') + '</ul>'; };
-  const code = String(r.code || '').split('').map(function (ch) {
-    return '<span style="display:inline-block;width:34px;height:40px;line-height:40px;margin-right:5px;text-align:center;border:1px solid rgba(255,255,255,.4);font-size:22px;font-weight:800">' + esc(ch) + '</span>';
-  }).join('');
-
-  // 1. 요약
-  const summary = '<table style="width:100%;border-collapse:collapse">' +
-    kv('가장 큰 고민', r.concern ? esc(r.concern.title) : '') +
-    kv('추천 서비스', r.concern ? esc(r.concern.service) + '<div style="font-weight:400;color:' + INK2 + ';font-size:11px">' + esc(r.concern.desc) + '</div>' : '') +
-    kv('추천 프로그램', esc(r.plan.name) + ' (월 ' + esc(r.plan.monthly) + ', 총 ' + esc(r.plan.total) + ', VAT 별도)', true) +
-    kv('추천 이유', esc(r.plan.why)) +
-    kv('가장 먼저 볼 축', esc(r.weakest)) +
-    kv('강점', esc((r.strengths || []).join(', ') || '없음')) +
-    kv('보완점', esc((r.gaps || []).join(', ') || '없음')) +
-    '</table>';
-
-  // 2. 축별 점수
-  const axisTable = '<table style="width:100%;border-collapse:collapse">' + r.axes.map(function (a) {
-    return '<tr><td style="padding:7px 0;width:95px;font-weight:700">' + esc(a.name) + '</td>' +
-      '<td style="padding:7px 10px">' + bar(a.score) + '</td>' +
-      '<td style="padding:7px 0;width:46px;text-align:right;font-weight:800">' + a.score + '점</td>' +
-      '<td style="padding:7px 0 7px 10px;width:150px;color:' + INK2 + ';font-size:11px">' + esc(a.side) + ', ' + esc(a.strength) + '</td></tr>';
-  }).join('') + '</table><div style="font-size:10px;color:' + INK3 + ';margin-top:4px">점수가 낮은 축부터 정렬. 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수. 축별 56점 이상이면 유형 앞 글자.</div>';
-
-  // 3. 축별 상세
-  const axisDetail = r.axes.map(function (a, idx) {
-    const qa = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">' + a.qa.map(function (x, i) {
-      return '<tr><td style="padding:5px 6px;border-top:1px solid ' + LINE + ';color:' + INK2 + ';width:22px">Q' + (i + 1) + '</td>' +
-        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';color:' + INK2 + '">' + esc(x.q) + '</td>' +
-        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';font-weight:700;width:170px">' + esc(x.a) + '</td>' +
-        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';text-align:right;width:30px;color:' + (x.s !== null && x.s <= 1 ? ROSE : INK2) + '">' + (x.s === null ? '-' : x.s + '/3') + '</td></tr>';
-    }).join('') + '</table>';
-    return '<div style="border:1px solid ' + LINE + ';padding:12px 14px;margin-bottom:10px;page-break-inside:avoid">' +
-      '<table style="width:100%;border-collapse:collapse"><tr><td style="font-size:13px;font-weight:800">' + (idx + 1) + ') ' + esc(a.name) +
-      ' <span style="font-size:11px;font-weight:600;color:' + INK2 + '">' + esc(a.side) + '</span></td>' +
-      '<td style="text-align:right;font-size:15px;font-weight:800;color:' + (a.score < 45 ? ROSE : NAVY) + '">' + a.score + '점 <span style="font-size:11px;color:' + INK2 + '">' + esc(a.verdict) + '</span></td></tr></table>' +
-      '<div style="margin-top:6px"><b style="color:' + NAVY2 + '">눈에 띄는 점</b> ' + esc(a.flag) + '</div>' +
-      '<div style="margin-top:4px"><b style="color:' + NAVY2 + '">함께 볼 부분</b> ' + esc(a.point) + '</div>' +
-      '<div style="margin-top:4px"><b style="color:' + NAVY2 + '">상담에서 다룰 내용</b>' + list(a.locked || []) + '</div>' + qa + '</div>';
-  }).join('');
-
-  // 4. 상담 진행 가이드
+  const NAVY = '#14206b', NAVY2 = '#2f3a9e', GRAY = '#f4f5f8', INK = '#16181f', INK2 = '#4b5060', INK3 = '#8a8f9e', RULE = '#d7d9e2', RED = '#b3263e';
+  const F = "font-family:'Noto Sans KR','Noto Sans CJK KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;";
+  const T = 'width:100%;border-collapse:collapse;';
   const w = r.axes[0];
   const cases = STAGE_CASES[r.stageKey] || [];
-  const lowQs = [];
-  r.axes.forEach(function (a) { a.qa.forEach(function (x) { if (x.s !== null && x.s <= 1) lowQs.push(a.name + ': "' + x.q + '" → ' + x.a); }); });
-  const guide = list([
-    '오프닝: 결과 유형 "' + r.code + ' ' + r.typeName + '"과 종합 ' + r.total + '점(' + r.verdict + ')을 먼저 함께 보며 시작',
-    r.concern ? '고민 확인: "' + r.concern.title + '" 고민의 구체적인 상황과 지금까지 시도한 방법 질문' : '고민 확인: 지금 가장 막히는 지점 질문',
-    '핵심 진단: ' + w.name + '(' + w.score + '점)이 가장 낮음. ' + w.flag,
-    '함께 확인할 문항 (1점 이하 응답): ' + (lowQs.length ? lowQs.length + '개' : '없음'),
-    '해결 방향: ' + (w.locked || []).join(', '),
-    '프로그램 제안: ' + r.plan.name + ' (월 ' + r.plan.monthly + ', 무이자 12개월). ' + r.plan.why,
-    '참고 합격 사례: ' + (cases.length ? cases.slice(0, 2).map(function (c) { return c[1] + ' → ' + c[0]; }).join(', ') : (r.plan.cases || []).join(', '))
-  ]) + (lowQs.length ? '<div style="margin-top:8px;font-size:11px;color:' + INK2 + '"><b>1점 이하 응답 문항</b>' + list(lowQs) + '</div>' : '');
 
-  // 같은 연차 합격 사례
-  const caseTable = cases.length ? '<table style="width:100%;border-collapse:collapse;font-size:11.5px">' +
-    '<tr><td style="padding:6px;background:' + LAV + ';font-weight:700;width:34%">합격 결과</td><td style="padding:6px;background:' + LAV + ';font-weight:700;width:20%">출발점</td><td style="padding:6px;background:' + LAV + ';font-weight:700">제로베이스에서 한 일</td><td style="padding:6px;background:' + LAV + ';font-weight:700;width:62px">프로그램</td></tr>' +
+  const sec = function (no, title, msg) {
+    return '<table style="' + T + 'margin:26px 0 10px"><tr>' +
+      '<td style="width:34px;font-size:15px;font-weight:700;color:' + NAVY2 + ';border-bottom:1.5px solid ' + NAVY + ';padding:0 0 6px">' + no + '</td>' +
+      '<td style="font-size:14px;font-weight:700;color:' + NAVY + ';border-bottom:1.5px solid ' + NAVY + ';padding:0 0 6px">' + title + '</td></tr></table>' +
+      (msg ? '<div style="font-size:12.5px;font-weight:700;color:' + INK + ';margin:0 0 10px">' + msg + '</div>' : '');
+  };
+  const th = function (t, wd) { return '<td style="padding:7px 8px;background:' + NAVY + ';color:#fff;font-size:10.5px;font-weight:700;' + (wd ? 'width:' + wd + ';' : '') + '">' + t + '</td>'; };
+  const td = function (t, st) { return '<td style="padding:7px 8px;border-bottom:1px solid ' + RULE + ';vertical-align:top;font-size:11px;' + (st || '') + '">' + t + '</td>'; };
+  const bullets = function (arr) {
+    return '<table style="' + T + '">' + arr.map(function (x) {
+      return '<tr><td style="width:14px;vertical-align:top;color:' + NAVY2 + ';font-size:11px;padding:2px 0">■</td><td style="font-size:11.5px;padding:2px 0;color:' + INK + '">' + x + '</td></tr>';
+    }).join('') + '</table>';
+  };
+  const bar = function (score) {
+    const s = Math.max(0, Math.min(100, Number(score) || 0)), color = s < 45 ? RED : NAVY;
+    return '<table style="' + T + '"><tr>' +
+      (s > 0 ? '<td style="width:' + s + '%;height:8px;background:' + color + '"></td>' : '') +
+      (s < 100 ? '<td style="height:8px;background:#e6e8ef"></td>' : '') + '</tr></table>';
+  };
+
+  // 핵심 메시지 (명사형)
+  const keyMsg = esc(w.name) + ' 보완이 최우선 과제이며, ' + esc(r.plan.name) + ' 프로그램 제안이 적합한 상황';
+
+  // 표지 헤더
+  const header =
+    '<table style="' + T + '"><tr>' +
+    '<td style="font-size:9.5px;letter-spacing:1.5px;color:' + INK3 + '">ZEROBASE CAREER AGENCY  |  INTERNAL</td>' +
+    '<td style="text-align:right;font-size:9.5px;color:' + INK3 + '">세일즈팀 상담 준비용</td></tr></table>' +
+    '<div style="height:3px;background:' + NAVY + ';margin:8px 0 14px"></div>' +
+    '<div style="font-size:22px;font-weight:700;color:' + INK + '">취업/이직 미니 진단 결과지</div>' +
+    '<div style="font-size:11.5px;color:' + INK2 + ';margin-top:4px">' + esc(d['이름']) + '님  |  ' + esc([r.track, r.stage].filter(Boolean).join(', ')) + (r.db ? '  |  ' + esc(r.db) : '') + '</div>' +
+    '<table style="' + T + 'margin-top:14px;border-top:1px solid ' + RULE + ';border-bottom:1px solid ' + RULE + '"><tr>' +
+    [['진단 유형', esc(r.code) + '  ' + esc(r.typeName)], ['종합 점수', r.total + '점 (' + esc(r.verdict) + ')'], ['추천 프로그램', esc(r.plan.name)], ['제출일시', esc(d['제출일시'])]].map(function (x, i) {
+      return '<td style="padding:10px 10px;' + (i ? 'border-left:1px solid ' + RULE + ';' : '') + 'vertical-align:top">' +
+        '<div style="font-size:9.5px;color:' + INK3 + '">' + x[0] + '</div><div style="font-size:12.5px;font-weight:700;color:' + (i === 2 ? NAVY2 : INK) + ';margin-top:2px">' + x[1] + '</div></td>';
+    }).join('') + '</tr></table>';
+
+  // 핵심 요약 박스
+  const exec =
+    '<table style="' + T + 'margin-top:16px"><tr><td style="width:4px;background:' + NAVY + '"></td><td style="background:' + GRAY + ';padding:14px 16px">' +
+    '<div style="font-size:9.5px;letter-spacing:1px;color:' + NAVY2 + ';font-weight:700">KEY MESSAGE</div>' +
+    '<div style="font-size:14px;font-weight:700;color:' + INK + ';margin:4px 0 8px">' + keyMsg + '</div>' +
+    bullets([
+      (r.concern ? '고객 고민: ' + esc(r.concern.title) + ' → ' + esc(r.concern.service) : '고객 고민: 미선택'),
+      '약점: ' + esc(w.name) + ' ' + w.score + '점 (' + esc(w.verdict) + '). ' + esc(w.flag),
+      '강점: ' + esc((r.strengths || []).join(', ') || '두드러진 강점 없음'),
+      '제안: ' + esc(r.plan.name) + ' 월 ' + esc(r.plan.monthly) + ' (무이자 12개월, 총 ' + esc(r.plan.total) + ', VAT 별도). ' + esc(r.plan.why)
+    ]) + '</td></tr></table>';
+
+  // 01 점수
+  const scoreTable = '<table style="' + T + '"><tr>' + th('평가 축', '110px') + th('점수 분포') + th('점수', '52px') + th('판정', '64px') + th('성향', '150px') + '</tr>' +
+    r.axes.map(function (a) {
+      return '<tr>' + td('<b>' + esc(a.name) + '</b>') + td(bar(a.score), 'vertical-align:middle;') +
+        td('<b style="color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</b>', 'text-align:right;') +
+        td(esc(a.verdict), 'color:' + (a.score < 45 ? RED : INK2) + ';') + td(esc(a.side) + ', ' + esc(a.strength), 'color:' + INK2 + ';') + '</tr>';
+    }).join('') + '</table>' +
+    '<div style="font-size:9.5px;color:' + INK3 + ';margin-top:5px">기준: 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수. 축별 56점 이상이면 유형 앞 글자. 점수가 낮은 축부터 정렬.</div>';
+
+  // 02 합격 사례
+  const caseTable = cases.length ? '<table style="' + T + '"><tr>' + th('합격 결과', '33%') + th('출발점', '20%') + th('제로베이스에서 한 일') + th('프로그램', '62px') + '</tr>' +
     cases.map(function (c) {
-      return '<tr><td style="padding:6px;border-bottom:1px solid ' + LINE + ';font-weight:700;vertical-align:top">' + esc(c[0]) + '</td>' +
-        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';color:' + INK2 + ';vertical-align:top">' + esc(c[1]) + '</td>' +
-        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';vertical-align:top">' + esc(c[2]) + '</td>' +
-        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';color:' + NAVY + ';font-weight:700;vertical-align:top">' + esc(c[3] || '-') + '</td></tr>';
-    }).join('') + '</table>' : '<div style="color:' + INK2 + '">해당 연차 사례 없음</div>';
+      return '<tr>' + td('<b>' + esc(c[0]) + '</b>') + td(esc(c[1]), 'color:' + INK2 + ';') + td(esc(c[2])) + td(esc(c[3] || '-'), 'color:' + NAVY2 + ';font-weight:700;') + '</tr>';
+    }).join('') + '</table>' +
+    '<div style="font-size:9.5px;color:' + INK3 + ';margin-top:5px">출처: 제로베이스 회원 합격 공유 (2026). 상담에서는 고객과 조건이 가까운 1~2건을 골라 소개.</div>'
+    : '<div style="font-size:11px;color:' + INK2 + '">해당 연차 사례 없음</div>';
 
-  // 제로베이스 전략
-  const strat = '<div style="font-weight:700">' + esc(r.stage) + ' 공통 전략</div>' + list(STAGE_STRATEGY[r.stageKey] || []) +
-    '<div style="font-weight:700;margin-top:8px">가장 약한 축(' + esc(w.name) + ') 처방</div>' +
-    '<div style="margin-top:3px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
-    '<div style="font-weight:700;margin-top:8px">추천 프로그램에서 제공하는 것 (' + esc(r.plan.name) + ')</div>' + list(r.plan.items || []);
+  // 03 전략
+  const strat = '<table style="' + T + '"><tr>' +
+    '<td style="width:50%;vertical-align:top;padding-right:10px"><div style="font-size:11px;font-weight:700;color:' + NAVY + ';border-bottom:1px solid ' + RULE + ';padding-bottom:4px;margin-bottom:6px">' + esc(r.stage) + ' 공통 전략</div>' + bullets((STAGE_STRATEGY[r.stageKey] || []).map(esc)) + '</td>' +
+    '<td style="width:50%;vertical-align:top;padding-left:10px"><div style="font-size:11px;font-weight:700;color:' + NAVY + ';border-bottom:1px solid ' + RULE + ';padding-bottom:4px;margin-bottom:6px">' + esc(w.name) + ' 처방</div>' + bullets([esc(AXIS_STRATEGY[w.name] || '')]) +
+    '<div style="font-size:11px;font-weight:700;color:' + NAVY + ';border-bottom:1px solid ' + RULE + ';padding-bottom:4px;margin:10px 0 6px">' + esc(r.plan.name) + ' 제공 내용</div>' + bullets((r.plan.items || []).map(esc)) + '</td>' +
+    '</tr></table>';
+
+  // 04 상담 가이드
+  const lowQs = [];
+  r.axes.forEach(function (a) { a.qa.forEach(function (x) { if (x.s !== null && x.s <= 1) lowQs.push([a.name, x.q, x.a]); }); });
+  const steps = [
+    ['오프닝', '유형 ' + esc(r.code) + ' ' + esc(r.typeName) + ', 종합 ' + r.total + '점을 함께 보며 시작'],
+    ['고민 확인', r.concern ? '"' + esc(r.concern.title) + '"의 구체적 상황과 지금까지 시도한 방법 질문' : '현재 가장 막히는 지점 질문'],
+    ['핵심 진단', esc(w.name) + ' ' + w.score + '점이 최저. ' + esc(w.flag)],
+    ['해결 방향', esc((w.locked || []).join(', '))],
+    ['사례 제시', cases.length ? cases.slice(0, 2).map(function (c) { return esc(c[1]) + ' → ' + esc(c[0]); }).join(' / ') : '-'],
+    ['프로그램 제안', esc(r.plan.name) + ' 월 ' + esc(r.plan.monthly) + '. ' + esc(r.plan.why)]
+  ];
+  const guide = '<table style="' + T + '">' + steps.map(function (s, i) {
+    return '<tr><td style="width:24px;padding:7px 0;vertical-align:top;font-size:11px;font-weight:700;color:' + NAVY2 + ';border-bottom:1px solid ' + RULE + '">' + (i + 1) + '</td>' +
+      '<td style="width:86px;padding:7px 0;vertical-align:top;font-size:11px;font-weight:700;border-bottom:1px solid ' + RULE + '">' + s[0] + '</td>' +
+      '<td style="padding:7px 0;font-size:11px;border-bottom:1px solid ' + RULE + '">' + s[1] + '</td></tr>';
+  }).join('') + '</table>' +
+    (lowQs.length ? '<div style="font-size:11px;font-weight:700;margin:12px 0 6px">확인이 필요한 응답 (1점 이하, ' + lowQs.length + '개)</div>' +
+      '<table style="' + T + '"><tr>' + th('평가 축', '90px') + th('문항') + th('응답', '150px') + '</tr>' +
+      lowQs.map(function (x) { return '<tr>' + td(esc(x[0]), 'color:' + INK2 + ';') + td(esc(x[1])) + td('<b style="color:' + RED + '">' + esc(x[2]) + '</b>') + '</tr>'; }).join('') + '</table>' : '');
+
+  // 05 축별 상세
+  const detail = r.axes.map(function (a, idx) {
+    return '<div style="page-break-inside:avoid;margin-bottom:16px">' +
+      '<table style="' + T + 'border-bottom:1px solid ' + INK + '"><tr>' +
+      '<td style="padding:0 0 5px;font-size:12.5px;font-weight:700">' + (idx + 1) + '. ' + esc(a.name) + '  <span style="font-size:10.5px;font-weight:400;color:' + INK2 + '">' + esc(a.side) + '</span></td>' +
+      '<td style="padding:0 0 5px;text-align:right;font-size:12.5px;font-weight:700;color:' + (a.score < 45 ? RED : NAVY) + '">' + a.score + '점  <span style="font-size:10.5px;font-weight:400;color:' + INK2 + '">' + esc(a.verdict) + '</span></td></tr></table>' +
+      '<table style="' + T + 'margin-top:6px">' +
+      '<tr><td style="width:96px;padding:4px 0;vertical-align:top;font-size:10.5px;font-weight:700;color:' + NAVY2 + '">진단</td><td style="padding:4px 0;font-size:11px">' + esc(a.flag) + '</td></tr>' +
+      '<tr><td style="padding:4px 0;vertical-align:top;font-size:10.5px;font-weight:700;color:' + NAVY2 + '">함께 볼 부분</td><td style="padding:4px 0;font-size:11px">' + esc(a.point) + '</td></tr>' +
+      '<tr><td style="padding:4px 0;vertical-align:top;font-size:10.5px;font-weight:700;color:' + NAVY2 + '">상담 의제</td><td style="padding:4px 0;font-size:11px">' + esc((a.locked || []).join(', ')) + '</td></tr></table>' +
+      '<table style="' + T + 'margin-top:6px"><tr>' + th('No.', '34px') + th('문항') + th('응답', '160px') + th('점수', '40px') + '</tr>' +
+      a.qa.map(function (x, i) {
+        return '<tr>' + td('Q' + (i + 1), 'color:' + INK2 + ';') + td(esc(x.q), 'color:' + INK2 + ';') + td('<b>' + esc(x.a) + '</b>') +
+          td(x.s === null ? '-' : x.s + '/3', 'text-align:right;' + (x.s !== null && x.s <= 1 ? 'color:' + RED + ';font-weight:700;' : 'color:' + INK2 + ';')) + '</tr>';
+      }).join('') + '</table></div>';
+  }).join('');
 
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
-    'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:' + INK + ';font-size:12px;margin:26px 32px;line-height:1.55}' +
+    'body{' + F + 'color:' + INK + ';font-size:11px;margin:30px 36px;line-height:1.6}' +
+    'td,div,span,b{' + F + '}' +
     '</style></head><body>' +
-    '<table style="width:100%;border-collapse:collapse"><tr><td><div style="font-size:11px;color:' + INK2 + '">제로베이스 취업정보회사 | 세일즈팀 상담 준비용</div>' +
-    '<div style="font-size:20px;font-weight:800;margin-top:2px">취업/이직 미니 진단 결과지</div></td>' +
-    '<td style="text-align:right;font-size:11px;color:' + INK2 + '">' + esc(d['제출일시']) + '</td></tr></table>' +
-
-    '<div style="background:' + NAVY + ';color:#fff;padding:16px 18px;margin-top:12px">' +
-    '<table style="width:100%;border-collapse:collapse;color:#fff"><tr><td>' +
-    '<div style="font-size:11px;opacity:.8">' + esc(d['이름']) + '님의 유형' + (d['연락처'] ? ' | ' + esc(d['연락처']) : '') + '</div>' +
-    '<div style="margin:7px 0">' + code + '</div><div style="font-size:17px;font-weight:800">' + esc(r.typeName) + '</div></td>' +
-    '<td style="text-align:right;vertical-align:bottom"><div style="font-size:11px;opacity:.8">종합 점수</div><div style="font-size:30px;font-weight:800">' + r.total + '<span style="font-size:13px">점</span></div><div style="font-size:11px">' + esc(r.verdict) + '</div></td></tr></table>' +
-    '<div style="font-size:11px;opacity:.85;margin-top:6px">' + esc([r.db, r.track, r.stage].filter(Boolean).join(' | ')) + '</div></div>' +
-
-    h2(1, '한눈에 보기') + summary +
-    h2(2, '취업/이직 공식 4개 축 점수') + axisTable +
-    h2(3, '같은 연차 합격 사례 (' + esc(r.stage) + ')') + caseTable +
-    '<div style="font-size:10px;color:' + INK3 + ';margin-top:4px">제로베이스 회원 실제 합격 사례. 상담에서 고객과 조건이 가까운 사례를 골라 소개.</div>' +
-    h2(4, '제로베이스 전략') + strat +
-    h2(5, '상담 진행 가이드') + guide +
-    h2(6, '축별 상세 진단') + axisDetail +
-    '<div style="margin-top:16px;font-size:10px;color:' + INK3 + '">12개 자가 응답 문항으로 산출한 참고용 진단입니다. 고객 화면에서는 유형까지만 공개되고, 이 문서의 상세 내용은 상담에서 안내합니다.</div>' +
+    header + exec +
+    sec('01', '취업/이직 공식 4개 축 진단', esc(w.name) + ' ' + w.score + '점으로 가장 낮고, ' + esc((r.strengths || []).length ? r.strengths.length + '개 축은 기준 이상' : '모든 축이 기준 미만')) + scoreTable +
+    sec('02', '같은 연차 합격 사례 (' + esc(r.stage) + ')', '같은 연차에서 제로베이스와 함께 목표를 달성한 사례') + caseTable +
+    sec('03', '제로베이스 전략', '연차 공통 전략과 약점 축 처방을 함께 제시') + strat +
+    sec('04', '상담 진행 가이드', '아래 순서로 진단 결과를 해설하고 프로그램 제안으로 연결') + guide +
+    sec('05', '축별 상세 진단', '') + detail +
+    '<div style="border-top:1px solid ' + RULE + ';margin-top:20px;padding-top:8px;font-size:9.5px;color:' + INK3 + '">' +
+    '본 결과지는 12개 자가 응답 문항으로 산출한 참고용 진단임. 고객 화면에는 유형까지만 공개되며, 상세 내용은 상담에서 안내. 응답 ID ' + esc(d['응답 ID'] || '-') + '</div>' +
     '</body></html>';
 }
 
