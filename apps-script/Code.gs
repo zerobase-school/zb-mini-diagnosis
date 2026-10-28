@@ -34,7 +34,7 @@ function doPost(e) {
       const url = makePdf(data);
       data[PDF_COL] = '=HYPERLINK("' + url + '","PDF 보기")';
     } catch (err) {
-      data[PDF_COL] = 'PDF 생성 실패: ' + String(err).slice(0, 80);
+      data[PDF_COL] = 'PDF 생성 실패: ' + String(err);
     }
 
     // 2) 열 준비: 결과지 PDF는 연락처 바로 옆
