@@ -561,18 +561,21 @@ const LINK_STAGE = stageFromLink();
 const LINK_TRACK = LINK_STAGE ? (/^new/.test(LINK_STAGE) ? "신입 취업" : "이직") : "";
 /* 링크의 연락처와 이름으로 앞서 남긴 DB 응답 불러오기 (Apps Script doGet) */
 let dbLookup = null;
-function startLookup() {
-  if (!LIVE || !SHEET_ENDPOINT || !LIVE_PROFILE.phone || !LIVE_PROFILE.name) return;
-  const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(LIVE_PROFILE.phone)}&name=${encodeURIComponent(LIVE_PROFILE.name)}`;
+function lookupDb(name, phone) {
+  if (!SHEET_ENDPOINT || !phone || !name) return Promise.resolve(false);
+  const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`;
   const timeout = new Promise(r => setTimeout(() => r(null), 8000));
-  dbLookup = Promise.race([fetch(u).then(r => r.json()).catch(() => null), timeout]).then(res => {
+  return Promise.race([fetch(u).then(r => r.json()).catch(() => null), timeout]).then(res => {
     if (res && res.found && res.fields && res.fields.length) {
-      Object.assign(LIVE_PROFILE, { db: res.db || LIVE_PROFILE.db, name: res.name || LIVE_PROFILE.name, fields: res.fields });
-      if (state.step === "intro") { applyProfile(LIVE_PROFILE); }
+      Object.assign(LIVE_PROFILE, { db: res.db || LIVE_PROFILE.db, name: res.name || name, phone, fields: res.fields });
       return true;
     }
     return false;
   });
+}
+function startLookup() {
+  if (!LIVE || !LIVE_PROFILE.phone || !LIVE_PROFILE.name) return;
+  dbLookup = lookupDb(LIVE_PROFILE.name, LIVE_PROFILE.phone).then(ok => { if (ok && state.step === "intro") applyProfile(LIVE_PROFILE); return ok; });
 }
 let PROFILE = PROFILES[0];
 const field = k => { const f = PROFILE.fields.find(x => x[0] === k); return f ? f[1] : ""; };
@@ -625,7 +628,7 @@ function showRow() {
   pnl.hidden = false;
 }
 
-const state = { step: "intro", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
+const state = { step: "intro", infoPhase: "", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
 const $ = id => document.getElementById(id);
 const app = $("app"), tabsEl = $("tabs"), bottom = $("bottom"), shell = $("app-shell");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -696,33 +699,47 @@ function renderIntro() {
     if (!LIVE) return go("known");
     if (dbLookup) { const b = $("go"); b.disabled = true; b.textContent = "앞서 남긴 답변을 불러오는 중..."; await dbLookup; }
     if (LIVE_PROFILE.fields.length) return go("known");
-    go(state.name && LINK_STAGE ? "concern" : "info");
+    go(state.name && LINK_STAGE && !LIVE_PROFILE.phone ? "concern" : "info");
   });
 }
 
 function fmtPhone(v) { const d = v.replace(/\D/g, "").slice(0, 11); return d.length < 4 ? d : d.length < 8 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, d.length - 4)}-${d.slice(-4)}`; }
 function renderInfo() {
+  // 1단계: 이름과 연락처로 앞서 남긴 DB 응답 찾기 → 못 찾으면 2단계: 구분과 연차 직접 선택
+  const askStage = state.infoPhase === "stage";
   const stages = state.track ? STAGES[state.track] : [];
   app.innerHTML = `
-    <div class="area-intro"><span class="eyebrow">기본 정보</span><h2>먼저 몇 가지만 알려주세요</h2><p class="muted">예약하신 상담 내역과 맞춰 결과지를 준비해 드려요.</p></div>
-    <section class="card">
+    <div class="area-intro"><span class="eyebrow">기본 정보</span>
+      <h2>${askStage ? "두 가지만 더 알려주세요" : "이름과 연락처를 알려주세요"}</h2>
+      <p class="muted">${askStage ? "앞서 남기신 답변을 찾지 못했어요. 연차를 알려주시면 바로 시작할게요." : "상담 신청 때 남기신 답변을 찾아서 이어서 진행해 드려요."}</p></div>
+    <section class="card" style="display:grid;gap:16px">
       <div class="field"><label for="in-name">이름</label><input class="input" id="in-name" autocomplete="name" placeholder="예: 김제로" value="${esc(state.name)}"></div>
+      <div class="field"><label for="in-phone">연락처</label><input class="input" id="in-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" value="${esc(state.phone)}"></div>
     </section>
-    ${LINK_STAGE ? "" : `<section class="card"><p class="q-title" style="margin-top:0">지금 무엇을 준비하고 있나요?</p>
+    ${askStage ? `<section class="card"><p class="q-title" style="margin-top:0">지금 무엇을 준비하고 있나요?</p>
       <div class="opts">${[["신입 취업", "첫 취업 또는 경력 1년 미만 중고신입"], ["이직", "경력을 살려 회사를 옮기려는 경우"]].map(([v, sub]) => `<button type="button" class="opt" data-track="${v}" aria-pressed="${state.track === v}"><span><b>${v}</b><small style="display:block;font-size:12.5px;color:var(--ink-3);font-weight:500">${sub}</small></span></button>`).join("")}</div>
-    </section>`}
-    ${state.track && !LINK_STAGE ? `<section class="card"><p class="q-title" style="margin-top:0">지금 연차를 알려주세요</p>
+    </section>
+    ${state.track ? `<section class="card"><p class="q-title" style="margin-top:0">지금 연차를 알려주세요</p>
       <div class="opts">${stages.map(([k, l]) => `<button type="button" class="opt" data-stage="${k}" aria-pressed="${state.stage === k}">${l}</button>`).join("")}</div>
-    </section>` : ""}`;
+    </section>` : ""}` : ""}`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">다음</button><button type="button" class="btn sub" id="back">이전으로</button>`;
-  const g = $("go"), n = $("in-name");
-  const check = () => { g.disabled = !(state.name && state.track && state.stage); };
+  const g = $("go"), n = $("in-name"), ph = $("in-phone");
+  const okId = () => state.name && state.phone.replace(/\D/g, "").length >= 10;
+  const check = () => { g.disabled = !(okId() && (!askStage || (state.track && state.stage))); };
   n.addEventListener("input", () => { state.name = n.value.trim(); check(); });
+  ph.addEventListener("input", () => { ph.value = fmtPhone(ph.value); state.phone = ph.value; check(); });
   app.querySelectorAll("[data-track]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.track; if (state.track !== v) { state.stage = ""; state.concern = null; } state.track = v; renderInfo(); }));
   app.querySelectorAll("[data-stage]").forEach(b => b.addEventListener("click", () => { if (state.stage !== b.dataset.stage) state.concern = null; state.stage = b.dataset.stage; app.querySelectorAll("[data-stage]").forEach(x => x.setAttribute("aria-pressed", x === b)); check(); }));
   check();
-  g.addEventListener("click", () => go("concern"));
-  $("back").addEventListener("click", () => go(LIVE_PROFILE.fields.length ? "known" : "intro"));
+  g.addEventListener("click", async () => {
+    if (askStage) return go("concern");
+    g.disabled = true; g.textContent = "앞서 남긴 답변을 찾는 중...";
+    const found = await lookupDb(state.name, state.phone);
+    if (found) { const ph0 = state.phone; applyProfile(LIVE_PROFILE); state.phone = ph0; return go("known"); }
+    if (LINK_STAGE) { state.track = LINK_TRACK; state.stage = LINK_STAGE; return go("concern"); }
+    state.infoPhase = "stage"; renderInfo(); scrollUp();
+  });
+  $("back").addEventListener("click", () => { if (askStage) { state.infoPhase = ""; renderInfo(); } else go("intro"); });
 }
 
 function renderKnown() {
@@ -741,7 +758,7 @@ function renderKnown() {
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">맞아요, 심층 진단 시작</button><button type="button" class="btn sub" id="edit">정보가 달라요</button>`;
   const m = $("more"); if (m) m.addEventListener("click", () => { app.querySelectorAll(".qa .more").forEach(x => x.hidden = false); m.remove(); });
   $("go").addEventListener("click", () => go("concern"));
-  $("edit").addEventListener("click", () => go(LIVE ? "info" : "track"));
+  $("edit").addEventListener("click", () => { if (LIVE) { state.infoPhase = "stage"; go("info"); } else go("track"); });
 }
 
 function choiceScreen({ eyebrow, title, desc, items, selected, onPick, next, back }) {
@@ -768,7 +785,7 @@ function renderConcern() {
   const list = CONCERNS[state.stage];
   choiceScreen({ eyebrow: "심층 질문", title: PROFILE.purposes[0] ? `<span class="nowrap">"${PROFILE.purposes[0]}"</span>을 남겨주셨어요.<br>그중 지금 가장 큰 고민은 무엇인가요?` : "지금 가장 큰 고민은 무엇인가요?", desc: `${stageLabel()} ${state.track} 준비생이 많이 하는 고민을 모았어요. 가장 가까운 하나를 골라 주세요.`,
     items: list.map((c, i) => [i, c[0], i === PROFILE.suggest ? "앞서 남긴 답변 기준 추천" : ""]), selected: state.concern,
-    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go(!LIVE || LIVE_PROFILE.fields.length ? "known" : (state.name && LINK_STAGE) ? "intro" : "info") });
+    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go(!LIVE || LIVE_PROFILE.fields.length ? "known" : "info") });
 }
 
 function renderArea() {
