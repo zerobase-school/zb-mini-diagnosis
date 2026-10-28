@@ -10,6 +10,7 @@
  *    - 다음 사용자 인증 정보로 실행: 나
  *
  * 동작
+ * - 링크에 연락처와 이름이 있으면 [ZB] SD 2.0 시트 DB RAW 탭에서 앞서 남긴 응답을 찾아 진단 페이지에 보여준다.
  * - 진단 페이지가 결과지를 열 때 응답 한 건을 JSON으로 보낸다.
  * - 응답 내용으로 PDF 결과지를 만들어 드라이브 "미니 진단 결과지" 폴더에 저장한다.
  * - 시트 첫 행의 열 이름에 맞춰 한 줄을 추가한다. PDF 링크는 "연락처" 바로 옆 열에 들어간다.
@@ -185,9 +186,55 @@ function reportHtml(d) {
 
 /* ---------- 확인용 ---------- */
 
-// 브라우저에서 URL을 열었을 때 연결 확인용
-function doGet() {
-  return json({ ok: true, message: '미니 진단 응답 수집 중' });
+// 진단 페이지가 링크의 연락처로 앞서 남긴 DB 응답을 불러올 때 사용
+// ?phone=01012345678&name=홍길동 → DB RAW 탭에서 연락처와 이름이 모두 맞는 가장 최근 응답을 돌려준다
+// 연락처만으로는 조회되지 않게 이름까지 맞아야 응답한다 (개인정보 보호)
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (!p.phone) return json({ ok: true, message: '미니 진단 응답 수집 중' });
+  try {
+    return json(lookupDb(p.phone, p.name || ''));
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  }
+}
+
+const DB_SHEET_ID = '1e7dIDsSq_Ja4bpWOosAgnv_12SY2papfe1Z-IyqNS_4'; // [ZB] SD 2.0
+const DB_TAB = 'DB RAW';
+// DB RAW 열 이름 → 화면에 보여줄 이름 (이 순서대로 보여줌)
+const DB_FIELDS = [
+  ['current_status', '현재 상황'], ['career_duration', '경력 기간'], ['target_company_size', '목표하는 기업 규모'],
+  ['target_industry', '목표하는 산업 분야'], ['education', '최종 학력'], ['age_range', '나이'], ['employment_timing', '희망 취업/이직 시기']
+];
+
+function normPhone(v) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.indexOf('82') === 0) d = '0' + d.slice(2);
+  if (/^1[016789]/.test(d)) d = '0' + d;
+  return d;
+}
+
+function lookupDb(phone, name) {
+  const want = normPhone(phone), wantName = String(name).trim();
+  if (want.length < 10 || !wantName) return { ok: true, found: false };
+  const values = SpreadsheetApp.openById(DB_SHEET_ID).getSheetByName(DB_TAB).getDataRange().getValues();
+  const h = values[0].map(String), col = function (k) { return h.indexOf(k); };
+  const cPhone = col('phone'), cName = col('name'), cDb = col('survey_name_snapshot'), cAt = col('submitted_at'), cExtra = col('additional_info');
+  for (let r = values.length - 1; r >= 1; r--) { // 아래쪽이 최신
+    const row = values[r];
+    if (normPhone(row[cPhone]) !== want || String(row[cName]).trim() !== wantName) continue;
+    const fields = [];
+    DB_FIELDS.forEach(function (f) { const i = col(f[0]); if (i > -1 && String(row[i]).trim()) fields.push([f[1], String(row[i]).trim()]); });
+    // additional_info 에 JSON으로 들어온 DB별 추가 문항도 함께 보여줌
+    if (cExtra > -1 && String(row[cExtra]).trim()) {
+      try {
+        const extra = JSON.parse(row[cExtra]);
+        Object.keys(extra).forEach(function (k) { const v = extra[k]; if (v !== '' && v !== null) fields.push([k, Array.isArray(v) ? v.join(', ') : String(v)]); });
+      } catch (e) {}
+    }
+    return { ok: true, found: true, db: String(row[cDb]).replace(/[^\p{L}\p{N}\s\/()·,.~-]/gu, '').trim(), name: String(row[cName]).trim(), submittedAt: String(row[cAt]), fields: fields };
+  }
+  return { ok: true, found: false };
 }
 
 // 편집기에서 직접 실행해 시트에 테스트 한 줄과 PDF가 생기는지 확인용

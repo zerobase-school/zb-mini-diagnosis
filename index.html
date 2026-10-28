@@ -559,16 +559,31 @@ function stageFromLink() {
 }
 const LINK_STAGE = stageFromLink();
 const LINK_TRACK = LINK_STAGE ? (/^new/.test(LINK_STAGE) ? "신입 취업" : "이직") : "";
+/* 링크의 연락처와 이름으로 앞서 남긴 DB 응답 불러오기 (Apps Script doGet) */
+let dbLookup = null;
+function startLookup() {
+  if (!LIVE || !SHEET_ENDPOINT || !LIVE_PROFILE.phone || !LIVE_PROFILE.name) return;
+  const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(LIVE_PROFILE.phone)}&name=${encodeURIComponent(LIVE_PROFILE.name)}`;
+  const timeout = new Promise(r => setTimeout(() => r(null), 8000));
+  dbLookup = Promise.race([fetch(u).then(r => r.json()).catch(() => null), timeout]).then(res => {
+    if (res && res.found && res.fields && res.fields.length) {
+      Object.assign(LIVE_PROFILE, { db: res.db || LIVE_PROFILE.db, name: res.name || LIVE_PROFILE.name, fields: res.fields });
+      if (state.step === "intro") { applyProfile(LIVE_PROFILE); }
+      return true;
+    }
+    return false;
+  });
+}
 let PROFILE = PROFILES[0];
 const field = k => { const f = PROFILE.fields.find(x => x[0] === k); return f ? f[1] : ""; };
 function applyProfile(p) {
   PROFILE = p;
   const exp = field("경력 기간"), sit = field("현재 상황");
-  const stage = /없음/.test(exp) ? "new" : /^1년/.test(exp) ? "jr" : /^(3년|5년)/.test(exp) ? "mid" : /^7년/.test(exp) ? "sr" : "new";
+  const stage = /없음/.test(exp) ? "new" : /^1년/.test(exp) ? "jr" : /^(3년|5년)/.test(exp) ? "mid" : /^(7년|10년)/.test(exp) ? "sr" : "new";
   const track = stage === "new" && !/직장인|돌취생/.test(sit) ? "신입 취업" : stage === "new" ? "신입 취업" : "이직";
   const answers = {}, pre = {};
   p.fields.forEach(([k, v]) => { const m = PREFILL[k]; if (m && m[2][v] != null) { (answers[m[0]] = answers[m[0]] || [])[m[1]] = m[2][v]; (pre[m[0]] = pre[m[0]] || {})[m[1]] = [k, v]; } });
-  Object.assign(state, { step: "intro", area: 0, name: p.name, phone: p.phone || "", track: p === LIVE_PROFILE ? LINK_TRACK : track, stage: p === LIVE_PROFILE ? LINK_STAGE : stage, concern: null, answers, pre });
+  Object.assign(state, { step: "intro", area: 0, name: p.name, phone: p.phone || "", track: p === LIVE_PROFILE && !p.fields.length ? LINK_TRACK : track, stage: p === LIVE_PROFILE && !p.fields.length ? LINK_STAGE : stage, concern: null, answers, pre });
 }
 function prefillCount() { return Object.values(state.pre || {}).reduce((n, o) => n + Object.keys(o).length, 0); }
 const SAMPLE = { name: "김제로", track: "이직", stage: "mid", concern: 2, answers: { st: [1, 2, 1], goal: [0, 1, 2], piv: [1, 1, 2], act: [2, 2, 1] } };
@@ -677,7 +692,12 @@ function renderIntro() {
       </div>
     </section>`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">시작하기</button>`;
-  $("go").addEventListener("click", () => go(!LIVE ? "known" : (state.name && LINK_STAGE) ? "concern" : "info"));
+  $("go").addEventListener("click", async () => {
+    if (!LIVE) return go("known");
+    if (dbLookup) { const b = $("go"); b.disabled = true; b.textContent = "앞서 남긴 답변을 불러오는 중..."; await dbLookup; }
+    if (LIVE_PROFILE.fields.length) return go("known");
+    go(state.name && LINK_STAGE ? "concern" : "info");
+  });
 }
 
 function fmtPhone(v) { const d = v.replace(/\D/g, "").slice(0, 11); return d.length < 4 ? d : d.length < 8 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, d.length - 4)}-${d.slice(-4)}`; }
@@ -702,11 +722,11 @@ function renderInfo() {
   app.querySelectorAll("[data-stage]").forEach(b => b.addEventListener("click", () => { if (state.stage !== b.dataset.stage) state.concern = null; state.stage = b.dataset.stage; app.querySelectorAll("[data-stage]").forEach(x => x.setAttribute("aria-pressed", x === b)); check(); }));
   check();
   g.addEventListener("click", () => go("concern"));
-  $("back").addEventListener("click", () => go("intro"));
+  $("back").addEventListener("click", () => go(LIVE_PROFILE.fields.length ? "known" : "intro"));
 }
 
 function renderKnown() {
-  const shown = PROFILE.fields.slice(2);
+  const shown = PROFILE.fields.filter(([k]) => k !== "현재 상황" && k !== "경력 기간");
   app.innerHTML = `
     <div class="area-intro"><span class="eyebrow">앞서 남겨주신 내용</span><h2>${esc(state.name)}님의 답변을 확인했어요</h2><p class="muted">상담에서 조금 더 유의미한 이야기를 나누기 위한 질문을 드릴게요.</p></div>
     <section class="card known">
@@ -721,7 +741,7 @@ function renderKnown() {
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">맞아요, 심층 진단 시작</button><button type="button" class="btn sub" id="edit">정보가 달라요</button>`;
   const m = $("more"); if (m) m.addEventListener("click", () => { app.querySelectorAll(".qa .more").forEach(x => x.hidden = false); m.remove(); });
   $("go").addEventListener("click", () => go("concern"));
-  $("edit").addEventListener("click", () => go("track"));
+  $("edit").addEventListener("click", () => go(LIVE ? "info" : "track"));
 }
 
 function choiceScreen({ eyebrow, title, desc, items, selected, onPick, next, back }) {
@@ -748,7 +768,7 @@ function renderConcern() {
   const list = CONCERNS[state.stage];
   choiceScreen({ eyebrow: "심층 질문", title: PROFILE.purposes[0] ? `<span class="nowrap">"${PROFILE.purposes[0]}"</span>을 남겨주셨어요.<br>그중 지금 가장 큰 고민은 무엇인가요?` : "지금 가장 큰 고민은 무엇인가요?", desc: `${stageLabel()} ${state.track} 준비생이 많이 하는 고민을 모았어요. 가장 가까운 하나를 골라 주세요.`,
     items: list.map((c, i) => [i, c[0], i === PROFILE.suggest ? "앞서 남긴 답변 기준 추천" : ""]), selected: state.concern,
-    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go(!LIVE ? "known" : (state.name && LINK_STAGE) ? "intro" : "info") });
+    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go(!LIVE || LIVE_PROFILE.fields.length ? "known" : (state.name && LINK_STAGE) ? "intro" : "info") });
 }
 
 function renderArea() {
@@ -906,6 +926,7 @@ document.querySelectorAll("[data-profile]").forEach(b => b.addEventListener("cli
 // 시연 메뉴는 주소 끝에 ?demo=1 을 붙였을 때만 보여요
 if (!new URLSearchParams(location.search).has("demo")) mbtn.hidden = true;
 applyProfile(LIVE ? LIVE_PROFILE : PROFILES[0]);
+startLookup();
 render();
 </script>
 </body>
