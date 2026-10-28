@@ -676,9 +676,8 @@ function renderInfo() {
   const stages = state.track ? STAGES[state.track] : [];
   app.innerHTML = `
     <div class="area-intro"><span class="eyebrow">기본 정보</span><h2>먼저 몇 가지만 알려주세요</h2><p class="muted">예약하신 상담 내역과 맞춰 결과지를 준비해 드려요.</p></div>
-    <section class="card" style="display:grid;gap:16px">
+    <section class="card">
       <div class="field"><label for="in-name">이름</label><input class="input" id="in-name" autocomplete="name" placeholder="예: 김제로" value="${esc(state.name)}"></div>
-      <div class="field"><label for="in-phone">연락처</label><input class="input" id="in-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" value="${esc(state.phone)}"></div>
     </section>
     <section class="card"><p class="q-title" style="margin-top:0">지금 무엇을 준비하고 있나요?</p>
       <div class="opts">${[["신입 취업", "첫 취업 또는 경력 1년 미만 중고신입"], ["이직", "경력을 살려 회사를 옮기려는 경우"]].map(([v, sub]) => `<button type="button" class="opt" data-track="${v}" aria-pressed="${state.track === v}"><span><b>${v}</b><small style="display:block;font-size:12.5px;color:var(--ink-3);font-weight:500">${sub}</small></span></button>`).join("")}</div>
@@ -687,10 +686,9 @@ function renderInfo() {
       <div class="opts">${stages.map(([k, l]) => `<button type="button" class="opt" data-stage="${k}" aria-pressed="${state.stage === k}">${l}</button>`).join("")}</div>
     </section>` : ""}`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">다음</button><button type="button" class="btn sub" id="back">이전으로</button>`;
-  const g = $("go"), n = $("in-name"), ph = $("in-phone");
-  const check = () => { g.disabled = !(state.name && state.phone.replace(/\D/g, "").length >= 10 && state.track && state.stage); };
+  const g = $("go"), n = $("in-name");
+  const check = () => { g.disabled = !(state.name && state.track && state.stage); };
   n.addEventListener("input", () => { state.name = n.value.trim(); check(); });
-  ph.addEventListener("input", () => { ph.value = fmtPhone(ph.value); state.phone = ph.value; check(); });
   app.querySelectorAll("[data-track]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.track; if (state.track !== v) { state.stage = ""; state.concern = null; } state.track = v; renderInfo(); }));
   app.querySelectorAll("[data-stage]").forEach(b => b.addEventListener("click", () => { if (state.stage !== b.dataset.stage) state.concern = null; state.stage = b.dataset.stage; app.querySelectorAll("[data-stage]").forEach(x => x.setAttribute("aria-pressed", x === b)); check(); }));
   check();
