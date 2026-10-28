@@ -562,7 +562,7 @@ function prefillCount() { return Object.values(state.pre || {}).reduce((n, o) =>
 const SAMPLE = { name: "김제로", track: "이직", stage: "mid", concern: 2, answers: { st: [1, 2, 1], goal: [0, 1, 2], piv: [1, 1, 2], act: [2, 2, 1] } };
 const DATA_LINE = "누적 합격 데이터 1만 8천 건";
 /* 시트 연결: Apps Script 웹 앱 URL을 넣으면 결과지가 열릴 때 응답 시트에 한 줄이 쌓임. 비어 있으면 시연 모드 */
-const SHEET_ENDPOINT = "https://script.google.com/a/macros/zero-base.co.kr/s/AKfycbzWCLv8a6PKRuh8iDa67qrEVPmQxBJWch_fhObC02b0ZI3h16g7xb3_vxuqfpENYgWA8Q/exec";
+const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbzWCLv8a6PKRuh8iDa67qrEVPmQxBJWch_fhObC02b0ZI3h16g7xb3_vxuqfpENYgWA8Q/exec";
 
 function buildRow() {
   const scores = AXES.map(a => ({ a, score: axisScore(a) }));
