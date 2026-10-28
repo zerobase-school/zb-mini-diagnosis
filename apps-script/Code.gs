@@ -175,7 +175,7 @@ function verdict(s) {
 /* ---------- 연차별 합격 사례와 제로베이스 전략 (PDF 전용) ----------
  * 출처: 슬랙 #zb_pm 설명회 합격 사례 정리, #zb_student_success 합격 공유 (2026년)
  * 고객 이름은 넣지 않음. 사례를 바꾸거나 추가할 때는 이 목록만 고치면 됨
- * [결과, 출발점, 제로베이스에서 한 일, 프로그램] */
+ * [결과, 출발점, 제로베이스에서 한 일, 프로그램(내부 참고용, 결과지에는 표시 안 함)] */
 const STAGE_CASES = {
   new: [
     ['LIG넥스원 최종 합격', '신입 취준생', '100문항 진단으로 목표 기업을 방산, 반도체 대기업으로 좁히고 지원 집중', '브라이트'],
@@ -320,8 +320,7 @@ function sheetHtml(d, r) {
     '<table style="' + T + '">' + (cases.length ? cases.slice(0, 3).map(function (c) {
       return '<tr><td style="font-size:9.5px;font-weight:700;padding:3px 4px 3px 0;border-bottom:1px solid #e3e3e3;width:38%;vertical-align:top">' + esc(c[0]) + '</td>' +
         '<td style="font-size:9px;color:' + INK2 + ';padding:3px 4px;border-bottom:1px solid #e3e3e3;width:20%;vertical-align:top">' + esc(c[1]) + '</td>' +
-        '<td style="font-size:9px;padding:3px 4px;border-bottom:1px solid #e3e3e3;vertical-align:top">' + esc(c[2]) + '</td>' +
-        '<td style="font-size:9px;font-weight:700;color:' + NAVY + ';padding:3px 0;border-bottom:1px solid #e3e3e3;width:50px;text-align:right;vertical-align:top">' + esc(c[3] || '') + '</td></tr>';
+        '<td style="font-size:9px;padding:3px 0 3px 4px;border-bottom:1px solid #e3e3e3;vertical-align:top">' + esc(c[2]) + '</td></tr>';
     }).join('') : '<tr><td style="font-size:9.5px;color:' + INK2 + '">해당 연차 사례 없음</td></tr>') + '</table>';
 
   const left = top.replace(/^/, '') && (formula + levels + qa + caseBlock);
@@ -468,9 +467,9 @@ function richHtml(d, r) {
     '<div style="font-size:9.5px;color:' + INK3 + ';margin-top:5px">기준: 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수. 축별 56점 이상이면 유형 앞 글자. 점수가 낮은 축부터 정렬.</div>';
 
   // 02 합격 사례
-  const caseTable = cases.length ? '<table style="' + T + '"><tr>' + th('합격 결과', '33%') + th('출발점', '20%') + th('제로베이스에서 한 일') + th('프로그램', '62px') + '</tr>' +
+  const caseTable = cases.length ? '<table style="' + T + '"><tr>' + th('합격 결과', '33%') + th('출발점', '20%') + th('제로베이스에서 한 일') + '</tr>' +
     cases.map(function (c) {
-      return '<tr>' + td('<b>' + esc(c[0]) + '</b>') + td(esc(c[1]), 'color:' + INK2 + ';') + td(esc(c[2])) + td(esc(c[3] || '-'), 'color:' + NAVY2 + ';font-weight:700;') + '</tr>';
+      return '<tr>' + td('<b>' + esc(c[0]) + '</b>') + td(esc(c[1]), 'color:' + INK2 + ';') + td(esc(c[2])) + '</tr>';
     }).join('') + '</table>' +
     '<div style="font-size:9.5px;color:' + INK3 + ';margin-top:5px">출처: 제로베이스 회원 합격 공유 (2026). 상담에서는 고객과 조건이 가까운 1~2건을 골라 소개.</div>'
     : '<div style="font-size:11px;color:' + INK2 + '">해당 연차 사례 없음</div>';
