@@ -615,12 +615,37 @@ function buildRow() {
   AXES.forEach(a => a.qs.forEach((q, i) => { const v = (state.answers[a.key] || [])[i]; row[`${a.short} Q${i + 1}`] = v != null ? q.o[v][0] : ""; }));
   return row;
 }
+/* PDF 결과지용 상세 내용 (세일즈팀 상담 준비용, 시트 열로는 남기지 않음) */
+function buildReport() {
+  const scores = AXES.map(a => ({ a, score: axisScore(a), high: isHigh(a) }));
+  const total = Math.round(scores.reduce((t, x) => t + x.score, 0) / scores.length);
+  const order = [...scores].sort((x, y) => x.score - y.score);
+  const gaps = scores.filter(x => !x.high), strengths = scores.filter(x => x.high);
+  const c = code(), con = concernInfo(), rp = recPlan(gaps, total), plan = PLANS.find(p => p.key === rp.key);
+  return {
+    code: c, typeName: TYPES[c], total, verdict: verdict(total)[1],
+    db: PROFILE.db, track: state.track, stage: stageLabel(),
+    strengths: strengths.map(x => `${x.a.hi[0]} ${x.a.hi[1]} (${x.a.name})`),
+    gaps: gaps.map(x => `${x.a.lo[0]} ${x.a.lo[1]} (${x.a.name})`),
+    weakest: order[0].a.name,
+    concern: con ? { title: con[0], service: con[1], desc: con[2] } : null,
+    plan: { name: plan.name, monthly: plan.monthly, total: plan.total, why: rp.why, items: [...plan.items, ...plan.plus], cases: plan.cases.map(x => x.filter(Boolean).join(" ")) },
+    axes: order.map(x => ({
+      name: x.a.name, score: x.score, verdict: verdict(x.score)[1],
+      side: x.high ? `${x.a.hi[0]} ${x.a.hi[1]}` : `${x.a.lo[0]} ${x.a.lo[1]}`, strength: strength(x.score, x.high),
+      flag: weakest(x.a).flag, point: x.a.point, locked: x.a.locked,
+      qa: x.a.qs.map((q, i) => { const v = (state.answers[x.a.key] || [])[i]; return { q: q.t, a: v != null ? q.o[v][0] : "", s: v != null ? q.o[v][1] : null }; })
+    })),
+    dbAnswers: (PROFILE.fields || []).map(([k, v]) => ({ k, v }))
+  };
+}
 let lastSent = null;
 function submitRow() {
   const row = buildRow(); lastSent = row;
+  const payload = Object.assign({}, row, { _report: JSON.stringify(buildReport()) });
   if (!SHEET_ENDPOINT) { toast("시연 모드라 시트로 보내지 않았어요. 시연 메뉴에서 보낼 데이터를 볼 수 있어요."); return; }
   try {
-    fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(row) })
+    fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
       .catch(() => toast("결과 저장에 실패했어요. 상담에서 다시 확인해 드릴게요."));
   } catch (e) {}
 }

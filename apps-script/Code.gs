@@ -32,6 +32,10 @@ function doPost(e) {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
 
     // 1) PDF는 자동 실행이 1분 안에 만들어 링크로 바꿈
+    //    결과지 상세 내용(_report)은 시트 열 대신 스크립트 저장소에 잠시 보관
+    const detail = data._report; delete data._report;
+    data['응답 ID'] = Utilities.getUuid().slice(0, 8);
+    if (detail) PropertiesService.getScriptProperties().setProperty('r_' + data['응답 ID'], detail);
     data[PDF_COL] = PDF_PENDING;
 
     // 2) 열 준비: 결과지 PDF는 연락처 바로 옆
@@ -94,8 +98,12 @@ function makePendingPdfs() {
       const data = {};
       headers.forEach(function (h, j) { const v = values[i][j]; data[h] = v instanceof Date ? Utilities.formatDate(v, 'Asia/Seoul', 'yyyy-MM-dd HH:mm') : v; });
       const target = sheet.getRange(i + 2, pdfIdx + 1);
+      const key = 'r_' + data['응답 ID'], props = PropertiesService.getScriptProperties();
+      let detail = null;
+      try { detail = JSON.parse(props.getProperty(key) || 'null'); } catch (e) {}
       try {
-        target.setFormula('=HYPERLINK("' + makePdf(data) + '","PDF 보기")');
+        target.setFormula('=HYPERLINK("' + makePdf(data, detail) + '","PDF 보기")');
+        props.deleteProperty(key);
       } catch (err) {
         target.setValue('PDF 생성 실패: ' + String(err));
       }
@@ -115,8 +123,8 @@ function setupPdfTrigger() {
 }
 
 
-function makePdf(d) {
-  const html = reportHtml(d);
+function makePdf(d, detail) {
+  const html = detail ? richHtml(d, detail) : reportHtml(d);
   const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
   const blob = Utilities.newBlob(html, 'text/html', 'report.html').getAs('application/pdf').setName(name);
@@ -146,6 +154,102 @@ function esc(v) {
 function verdict(s) {
   s = Number(s) || 0;
   return s < 45 ? '보완 필요' : s < 75 ? '표준' : '우수';
+}
+
+/* 상세 결과지 (세일즈팀 상담 준비용) */
+function richHtml(d, r) {
+  const NAVY = '#1d2483', NAVY2 = '#3a41c4', LAV = '#eeeefb', INK = '#1a1d2e', INK2 = '#5a5f73', INK3 = '#8a8fa3', LINE = '#e3e4ee', ROSE = '#d23f6a';
+  const cell = 'padding:6px 0;vertical-align:top;';
+  const bar = function (score) {
+    const s = Math.max(0, Math.min(100, Number(score) || 0)), color = s < 45 ? ROSE : NAVY;
+    return '<table style="width:100%;border-collapse:collapse"><tr>' +
+      (s > 0 ? '<td style="width:' + s + '%;height:9px;background:' + color + '"></td>' : '') +
+      (s < 100 ? '<td style="height:9px;background:' + LAV + '"></td>' : '') + '</tr></table>';
+  };
+  const h2 = function (num, t) { return '<div style="margin:22px 0 8px;padding-bottom:5px;border-bottom:2px solid ' + NAVY + ';font-size:14px;font-weight:800;color:' + NAVY + '">' + num + '. ' + t + '</div>'; };
+  const kv = function (k, v, strong) { return v ? '<tr><td style="' + cell + 'color:' + INK2 + ';width:120px">' + k + '</td><td style="' + cell + (strong ? 'font-weight:800;color:' + NAVY : 'font-weight:600') + '">' + v + '</td></tr>' : ''; };
+  const list = function (arr) { return '<ul style="margin:4px 0 0 16px;padding:0">' + arr.map(function (x) { return '<li style="margin:2px 0">' + esc(x) + '</li>'; }).join('') + '</ul>'; };
+  const code = String(r.code || '').split('').map(function (ch) {
+    return '<span style="display:inline-block;width:34px;height:40px;line-height:40px;margin-right:5px;text-align:center;border:1px solid rgba(255,255,255,.4);font-size:22px;font-weight:800">' + esc(ch) + '</span>';
+  }).join('');
+
+  // 1. 요약
+  const summary = '<table style="width:100%;border-collapse:collapse">' +
+    kv('가장 큰 고민', r.concern ? esc(r.concern.title) : '') +
+    kv('추천 서비스', r.concern ? esc(r.concern.service) + '<div style="font-weight:400;color:' + INK2 + ';font-size:11px">' + esc(r.concern.desc) + '</div>' : '') +
+    kv('추천 프로그램', esc(r.plan.name) + ' (월 ' + esc(r.plan.monthly) + ', 총 ' + esc(r.plan.total) + ', VAT 별도)', true) +
+    kv('추천 이유', esc(r.plan.why)) +
+    kv('가장 먼저 볼 축', esc(r.weakest)) +
+    kv('강점', esc((r.strengths || []).join(', ') || '없음')) +
+    kv('보완점', esc((r.gaps || []).join(', ') || '없음')) +
+    '</table>';
+
+  // 2. 축별 점수
+  const axisTable = '<table style="width:100%;border-collapse:collapse">' + r.axes.map(function (a) {
+    return '<tr><td style="padding:7px 0;width:95px;font-weight:700">' + esc(a.name) + '</td>' +
+      '<td style="padding:7px 10px">' + bar(a.score) + '</td>' +
+      '<td style="padding:7px 0;width:46px;text-align:right;font-weight:800">' + a.score + '점</td>' +
+      '<td style="padding:7px 0 7px 10px;width:150px;color:' + INK2 + ';font-size:11px">' + esc(a.side) + ', ' + esc(a.strength) + '</td></tr>';
+  }).join('') + '</table><div style="font-size:10px;color:' + INK3 + ';margin-top:4px">점수가 낮은 축부터 정렬. 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수. 축별 56점 이상이면 유형 앞 글자.</div>';
+
+  // 3. 축별 상세
+  const axisDetail = r.axes.map(function (a, idx) {
+    const qa = '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">' + a.qa.map(function (x, i) {
+      return '<tr><td style="padding:5px 6px;border-top:1px solid ' + LINE + ';color:' + INK2 + ';width:22px">Q' + (i + 1) + '</td>' +
+        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';color:' + INK2 + '">' + esc(x.q) + '</td>' +
+        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';font-weight:700;width:170px">' + esc(x.a) + '</td>' +
+        '<td style="padding:5px 6px;border-top:1px solid ' + LINE + ';text-align:right;width:30px;color:' + (x.s !== null && x.s <= 1 ? ROSE : INK2) + '">' + (x.s === null ? '-' : x.s + '/3') + '</td></tr>';
+    }).join('') + '</table>';
+    return '<div style="border:1px solid ' + LINE + ';padding:12px 14px;margin-bottom:10px;page-break-inside:avoid">' +
+      '<table style="width:100%;border-collapse:collapse"><tr><td style="font-size:13px;font-weight:800">' + (idx + 1) + ') ' + esc(a.name) +
+      ' <span style="font-size:11px;font-weight:600;color:' + INK2 + '">' + esc(a.side) + '</span></td>' +
+      '<td style="text-align:right;font-size:15px;font-weight:800;color:' + (a.score < 45 ? ROSE : NAVY) + '">' + a.score + '점 <span style="font-size:11px;color:' + INK2 + '">' + esc(a.verdict) + '</span></td></tr></table>' +
+      '<div style="margin-top:6px"><b style="color:' + NAVY2 + '">눈에 띄는 점</b> ' + esc(a.flag) + '</div>' +
+      '<div style="margin-top:4px"><b style="color:' + NAVY2 + '">함께 볼 부분</b> ' + esc(a.point) + '</div>' +
+      '<div style="margin-top:4px"><b style="color:' + NAVY2 + '">상담에서 다룰 내용</b>' + list(a.locked || []) + '</div>' + qa + '</div>';
+  }).join('');
+
+  // 4. 상담 진행 가이드
+  const w = r.axes[0];
+  const lowQs = [];
+  r.axes.forEach(function (a) { a.qa.forEach(function (x) { if (x.s !== null && x.s <= 1) lowQs.push(a.name + ': "' + x.q + '" → ' + x.a); }); });
+  const guide = list([
+    '오프닝: 결과 유형 "' + r.code + ' ' + r.typeName + '"과 종합 ' + r.total + '점(' + r.verdict + ')을 먼저 함께 보며 시작',
+    r.concern ? '고민 확인: "' + r.concern.title + '" 고민의 구체적인 상황과 지금까지 시도한 방법 질문' : '고민 확인: 지금 가장 막히는 지점 질문',
+    '핵심 진단: ' + w.name + '(' + w.score + '점)이 가장 낮음. ' + w.flag,
+    '함께 확인할 문항 (1점 이하 응답): ' + (lowQs.length ? lowQs.length + '개' : '없음'),
+    '해결 방향: ' + (w.locked || []).join(', '),
+    '프로그램 제안: ' + r.plan.name + ' (월 ' + r.plan.monthly + ', 무이자 12개월). ' + r.plan.why,
+    '참고 합격 사례: ' + (r.plan.cases || []).join(', ')
+  ]) + (lowQs.length ? '<div style="margin-top:8px;font-size:11px;color:' + INK2 + '"><b>1점 이하 응답 문항</b>' + list(lowQs) + '</div>' : '');
+
+  // 5. 앞서 남긴 DB 답변
+  const dbTable = (r.dbAnswers && r.dbAnswers.length) ? h2(5, '앞서 남긴 DB 답변' + (r.db ? ' (' + esc(r.db) + ')' : '')) +
+    '<table style="width:100%;border-collapse:collapse;font-size:11.5px">' + r.dbAnswers.map(function (x) {
+      return '<tr><td style="padding:5px 0;border-bottom:1px solid ' + LINE + ';color:' + INK2 + ';width:160px">' + esc(x.k) + '</td><td style="padding:5px 0;border-bottom:1px solid ' + LINE + ';font-weight:600">' + esc(x.v) + '</td></tr>';
+    }).join('') + '</table>' : '';
+
+  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:' + INK + ';font-size:12px;margin:26px 32px;line-height:1.55}' +
+    '</style></head><body>' +
+    '<table style="width:100%;border-collapse:collapse"><tr><td><div style="font-size:11px;color:' + INK2 + '">제로베이스 취업정보회사 | 세일즈팀 상담 준비용</div>' +
+    '<div style="font-size:20px;font-weight:800;margin-top:2px">취업/이직 미니 진단 결과지</div></td>' +
+    '<td style="text-align:right;font-size:11px;color:' + INK2 + '">' + esc(d['제출일시']) + '</td></tr></table>' +
+
+    '<div style="background:' + NAVY + ';color:#fff;padding:16px 18px;margin-top:12px">' +
+    '<table style="width:100%;border-collapse:collapse;color:#fff"><tr><td>' +
+    '<div style="font-size:11px;opacity:.8">' + esc(d['이름']) + '님의 유형' + (d['연락처'] ? ' | ' + esc(d['연락처']) : '') + '</div>' +
+    '<div style="margin:7px 0">' + code + '</div><div style="font-size:17px;font-weight:800">' + esc(r.typeName) + '</div></td>' +
+    '<td style="text-align:right;vertical-align:bottom"><div style="font-size:11px;opacity:.8">종합 점수</div><div style="font-size:30px;font-weight:800">' + r.total + '<span style="font-size:13px">점</span></div><div style="font-size:11px">' + esc(r.verdict) + '</div></td></tr></table>' +
+    '<div style="font-size:11px;opacity:.85;margin-top:6px">' + esc([r.db, r.track, r.stage].filter(Boolean).join(' | ')) + '</div></div>' +
+
+    h2(1, '한눈에 보기') + summary +
+    h2(2, '취업/이직 공식 4개 축 점수') + axisTable +
+    h2(3, '상담 진행 가이드') + guide +
+    h2(4, '축별 상세 진단') + axisDetail +
+    dbTable +
+    '<div style="margin-top:16px;font-size:10px;color:' + INK3 + '">12개 자가 응답 문항으로 산출한 참고용 진단입니다. 고객 화면에서는 유형까지만 공개되고, 이 문서의 상세 내용은 상담에서 안내합니다.</div>' +
+    '</body></html>';
 }
 
 function reportHtml(d) {
