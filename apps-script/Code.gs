@@ -156,6 +156,57 @@ function verdict(s) {
   return s < 45 ? '보완 필요' : s < 75 ? '표준' : '우수';
 }
 
+/* ---------- 연차별 합격 사례와 제로베이스 전략 (PDF 전용) ----------
+ * 출처: 슬랙 #zb_pm 설명회 합격 사례 정리, #zb_student_success 합격 공유 (2026년)
+ * 고객 이름은 넣지 않음. 사례를 바꾸거나 추가할 때는 이 목록만 고치면 됨
+ * [결과, 출발점, 제로베이스에서 한 일, 프로그램] */
+const STAGE_CASES = {
+  new: [
+    ['LIG넥스원 최종 합격', '신입 취준생', '100문항 진단으로 목표 기업을 방산, 반도체 대기업으로 좁히고 지원 집중', '브라이트'],
+    ['현대자동차, CJ제일제당, 삼일회계법인 인적성 합격', '신입 취준생', '컨설팅 2, 3회차에서 타깃 기업 비교와 적합도 진단 후 단기, 중기, 장기 실행 루틴 설계', '노바'],
+    ['현대트랜시스 파워트레인 채용연계형 인턴', '첫 취업', '현대차 직무 특강과 멘토링으로 서류, 면접 집중 준비. 결제 후 2개월 만에 합격', '노바'],
+    ['포스코DX 신입 공채 합격', '장교 전역 (군 경력 4년 6개월)', '멘토링 1회차에 경험과 전략 총괄 설계, 3회차에 경험 기반 지원 기업 정리', '프레스티지'],
+    ['한국항공우주산업(KAI), 대한송유관공사 동시 최종 합격', '신입 취준생', '멘토링 12회차 동안 리포트 기반으로 기업 지원 병행', '']
+  ],
+  jr: [
+    ['SK하이닉스 경력 서류 합격', '공정 엔지니어 1년 7개월', '컨설팅 1회차에 업무 로그 속 경험 정리, 멘토링 3회차에 실제 합격 자소서로 피드백', '노바'],
+    ['토스 CX 최종 합격', '전환형 인턴 경력', '직무 경험을 CX 역량으로 재구성해 플랫폼 기업으로 확장 지원', ''],
+    ['DL이앤씨 합격', '저연차 경력', '진행 중 서류, 면접 합격을 이어가며 목표 기업군 단계적 상향', '']
+  ],
+  mid: [
+    ['신한투자증권 마케팅데이터 분석 이직', '은행 마케팅 7년차', '컨설팅 1회차에 경력 기반 Plan A(데이터 마케팅) 설정, 2회차에 대기업과 대형 금융사로 타깃 확정', '브라이트'],
+    ['KT&G 향료 연구 이직', '연구직 5년 경력', '중도 포기 직전에서 목표를 다시 잡고 기업별 지원 전략 재정비', '노바'],
+    ['현대홈쇼핑 CX 기획 이직', '총 경력 3년 6개월', '컨설팅 2, 3회차에 기획, CX 직무 추천과 서류 전략, 5회차 포트폴리오 피드백', '프리미엄'],
+    ['CJ올리브영 클라우드 엔지니어 면접 합격', '금융권 3년 8개월', '채용 공고 분석 피드백으로 강점, 약점, 키워드 배치 순서 재구성 후 서류 합격', '노바'],
+    ['쏘카 이직', '스타트업 5년 6개월', '모빌리티 산업을 1순위로 두고 산업 적합도 기준으로 지원 우선순위 설정', ''],
+    ['자동차 기업 PM 연봉 1,500만 원 상향 이직', 'PM 5년차', '경력 성과를 수치 중심으로 재정리해 처우 협상까지 연결', '']
+  ],
+  sr: [
+    ['JYP엔터테인먼트 최종 합격', '8년차', '컨설팅 단계에서 서류를 처음부터 다시 쓰고, 멘토링으로 사전과제와 1, 2차 면접 대비', ''],
+    ['LH 법무 이직', '경력 6년 6개월', '경력을 공공기관 직무 요건에 맞춰 재구성', ''],
+    ['한화자산운용 미들오피스 이직', '금융권 경력직', '멘토링 10회차를 모두 진행하며 희망 금융권 포지션으로 이동', '브라이트'],
+    ['펑타이코리아 경력직 마케터', '경력직 마케터', '컨설팅 2회차 산업 VALUE CHAIN 분석에서 적합도 5점 기업을 우선 준비', '프리미엄']
+  ]
+};
+STAGE_CASES.new2 = STAGE_CASES.new;
+
+// 연차별 제로베이스만의 전략
+const STAGE_STRATEGY = {
+  new: ['100문항 진단으로 스펙 위치를 확인하고 목표 기업군을 대기업, 중견, 공기업 중 확정', '주차별 대기업 공채 마감 캘린더로 지원 일정을 놓치지 않게 관리', '타깃 기업 비교와 적합도 진단 후 단기, 중기, 장기 실행 루틴 설계', '기업별 인적성(GSAT, SKCT, HMAT 등) 모의고사와 스터디로 필기 대비'],
+  jr: ['업무 로그 속 경험을 문제, 행동, 결과로 정리해 경력과 직무 역량 연결', '중고신입과 경력직 중 유리한 포지셔닝 판단', '같은 연차 실제 합격 자소서와 경력기술서로 1:1 비교 피드백', '1년차 경험도 수치 성과로 바꾸는 성과 수치화 작업'],
+  mid: ['경력 기반 Plan A, B, C 설정 후 대기업, 대형 금융사 등 목표 도메인 확정', '산업 VALUE CHAIN 분석으로 기업별 적합도를 점수화해 우선순위 결정', '마스터 경력기술서, 포트폴리오 완성 프로그램(노바, 프레스티지 공통)', '상향 이직 시 처우 협상 포인트 정리'],
+  sr: ['리더급, 비공개 포지션은 헤드헌팅으로 연결', '경력기술서를 처음부터 다시 설계하고 사전과제, 다차 면접 대비', '다음 10년 기준 커리어 Plan A, B, C 재설계', '연봉, 직급 처우 협상 전략']
+};
+STAGE_STRATEGY.new2 = STAGE_STRATEGY.new;
+
+// 가장 약한 축별 제로베이스 처방
+const AXIS_STRATEGY = {
+  '업무 구조화': '합격 경력기술서의 구조화 패턴과 비교하고, 마스터 경력기술서 프로그램으로 경험을 문제, 행동, 결과 구조로 재작성',
+  '목표 구체화': 'Plan A, B, C 기법으로 연차와 직무 기준 목표를 세우고, 목표 기업별 최근 합격자 조건과 비교해 지원 우선순위 확정',
+  '취업/이직 전략': 'Pivot 프레임워크로 지금 강점을 축으로 옮길 경로를 설계하고, 지원 결과 기록으로 탈락 원인을 추적',
+  '실전 준비도': '최신 합격 서류와 내 서류를 비교하고, 기업별 면접 복기 자료로 탈락 패턴과 예상 질문을 대비'
+};
+
 /* 상세 결과지 (세일즈팀 상담 준비용) */
 function richHtml(d, r) {
   const NAVY = '#1d2483', NAVY2 = '#3a41c4', LAV = '#eeeefb', INK = '#1a1d2e', INK2 = '#5a5f73', INK3 = '#8a8fa3', LINE = '#e3e4ee', ROSE = '#d23f6a';
@@ -211,6 +262,7 @@ function richHtml(d, r) {
 
   // 4. 상담 진행 가이드
   const w = r.axes[0];
+  const cases = STAGE_CASES[r.stageKey] || [];
   const lowQs = [];
   r.axes.forEach(function (a) { a.qa.forEach(function (x) { if (x.s !== null && x.s <= 1) lowQs.push(a.name + ': "' + x.q + '" → ' + x.a); }); });
   const guide = list([
@@ -220,14 +272,24 @@ function richHtml(d, r) {
     '함께 확인할 문항 (1점 이하 응답): ' + (lowQs.length ? lowQs.length + '개' : '없음'),
     '해결 방향: ' + (w.locked || []).join(', '),
     '프로그램 제안: ' + r.plan.name + ' (월 ' + r.plan.monthly + ', 무이자 12개월). ' + r.plan.why,
-    '참고 합격 사례: ' + (r.plan.cases || []).join(', ')
+    '참고 합격 사례: ' + (cases.length ? cases.slice(0, 2).map(function (c) { return c[1] + ' → ' + c[0]; }).join(', ') : (r.plan.cases || []).join(', '))
   ]) + (lowQs.length ? '<div style="margin-top:8px;font-size:11px;color:' + INK2 + '"><b>1점 이하 응답 문항</b>' + list(lowQs) + '</div>' : '');
 
-  // 5. 앞서 남긴 DB 답변
-  const dbTable = (r.dbAnswers && r.dbAnswers.length) ? h2(5, '앞서 남긴 DB 답변' + (r.db ? ' (' + esc(r.db) + ')' : '')) +
-    '<table style="width:100%;border-collapse:collapse;font-size:11.5px">' + r.dbAnswers.map(function (x) {
-      return '<tr><td style="padding:5px 0;border-bottom:1px solid ' + LINE + ';color:' + INK2 + ';width:160px">' + esc(x.k) + '</td><td style="padding:5px 0;border-bottom:1px solid ' + LINE + ';font-weight:600">' + esc(x.v) + '</td></tr>';
-    }).join('') + '</table>' : '';
+  // 같은 연차 합격 사례
+  const caseTable = cases.length ? '<table style="width:100%;border-collapse:collapse;font-size:11.5px">' +
+    '<tr><td style="padding:6px;background:' + LAV + ';font-weight:700;width:34%">합격 결과</td><td style="padding:6px;background:' + LAV + ';font-weight:700;width:20%">출발점</td><td style="padding:6px;background:' + LAV + ';font-weight:700">제로베이스에서 한 일</td><td style="padding:6px;background:' + LAV + ';font-weight:700;width:62px">프로그램</td></tr>' +
+    cases.map(function (c) {
+      return '<tr><td style="padding:6px;border-bottom:1px solid ' + LINE + ';font-weight:700;vertical-align:top">' + esc(c[0]) + '</td>' +
+        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';color:' + INK2 + ';vertical-align:top">' + esc(c[1]) + '</td>' +
+        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';vertical-align:top">' + esc(c[2]) + '</td>' +
+        '<td style="padding:6px;border-bottom:1px solid ' + LINE + ';color:' + NAVY + ';font-weight:700;vertical-align:top">' + esc(c[3] || '-') + '</td></tr>';
+    }).join('') + '</table>' : '<div style="color:' + INK2 + '">해당 연차 사례 없음</div>';
+
+  // 제로베이스 전략
+  const strat = '<div style="font-weight:700">' + esc(r.stage) + ' 공통 전략</div>' + list(STAGE_STRATEGY[r.stageKey] || []) +
+    '<div style="font-weight:700;margin-top:8px">가장 약한 축(' + esc(w.name) + ') 처방</div>' +
+    '<div style="margin-top:3px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
+    '<div style="font-weight:700;margin-top:8px">추천 프로그램에서 제공하는 것 (' + esc(r.plan.name) + ')</div>' + list(r.plan.items || []);
 
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:' + INK + ';font-size:12px;margin:26px 32px;line-height:1.55}' +
@@ -245,9 +307,11 @@ function richHtml(d, r) {
 
     h2(1, '한눈에 보기') + summary +
     h2(2, '취업/이직 공식 4개 축 점수') + axisTable +
-    h2(3, '상담 진행 가이드') + guide +
-    h2(4, '축별 상세 진단') + axisDetail +
-    dbTable +
+    h2(3, '같은 연차 합격 사례 (' + esc(r.stage) + ')') + caseTable +
+    '<div style="font-size:10px;color:' + INK3 + ';margin-top:4px">제로베이스 회원 실제 합격 사례. 상담에서 고객과 조건이 가까운 사례를 골라 소개.</div>' +
+    h2(4, '제로베이스 전략') + strat +
+    h2(5, '상담 진행 가이드') + guide +
+    h2(6, '축별 상세 진단') + axisDetail +
     '<div style="margin-top:16px;font-size:10px;color:' + INK3 + '">12개 자가 응답 문항으로 산출한 참고용 진단입니다. 고객 화면에서는 유형까지만 공개되고, 이 문서의 상세 내용은 상담에서 안내합니다.</div>' +
     '</body></html>';
 }

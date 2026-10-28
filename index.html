@@ -624,7 +624,7 @@ function buildReport() {
   const c = code(), con = concernInfo(), rp = recPlan(gaps, total), plan = PLANS.find(p => p.key === rp.key);
   return {
     code: c, typeName: TYPES[c], total, verdict: verdict(total)[1],
-    db: PROFILE.db, track: state.track, stage: stageLabel(),
+    db: PROFILE.db, track: state.track, stage: stageLabel(), stageKey: state.stage,
     strengths: strengths.map(x => `${x.a.hi[0]} ${x.a.hi[1]} (${x.a.name})`),
     gaps: gaps.map(x => `${x.a.lo[0]} ${x.a.lo[1]} (${x.a.name})`),
     weakest: order[0].a.name,
