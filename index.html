@@ -547,6 +547,9 @@ const PREFILL = {
   "목표 대기업 JD 적합도": ["goal", 2, { "70% 이상 일치": 0, "50~70% 미만 일치": 1, "일부 유사한 경험 존재": 2, "거의 일치하지 않음 / 모름": 3 }],
   "현재 직무와 지원 직무 일치": ["piv", 0, { "동일 직무": 1, "유사 직무": 1, "직무 전환 예정": 2 }]
 };
+const QS = new URLSearchParams(location.search);
+const LIVE = !QS.has("demo"); // 실제 배포: 주소에 ?demo=1 이 없으면 실제 진단 모드
+const LIVE_PROFILE = { db: QS.get("db") || "", name: QS.get("name") || "", phone: QS.get("phone") || "", suggest: -1, sample: null, purposes: [], booking: null, fields: [] };
 let PROFILE = PROFILES[0];
 const field = k => { const f = PROFILE.fields.find(x => x[0] === k); return f ? f[1] : ""; };
 function applyProfile(p) {
@@ -556,7 +559,7 @@ function applyProfile(p) {
   const track = stage === "new" && !/직장인|돌취생/.test(sit) ? "신입 취업" : stage === "new" ? "신입 취업" : "이직";
   const answers = {}, pre = {};
   p.fields.forEach(([k, v]) => { const m = PREFILL[k]; if (m && m[2][v] != null) { (answers[m[0]] = answers[m[0]] || [])[m[1]] = m[2][v]; (pre[m[0]] = pre[m[0]] || {})[m[1]] = [k, v]; } });
-  Object.assign(state, { step: "intro", area: 0, name: p.name, track, stage, concern: null, answers, pre });
+  Object.assign(state, { step: "intro", area: 0, name: p.name, phone: p.phone || "", track: p === LIVE_PROFILE ? "" : track, stage: p === LIVE_PROFILE ? "" : stage, concern: null, answers, pre });
 }
 function prefillCount() { return Object.values(state.pre || {}).reduce((n, o) => n + Object.keys(o).length, 0); }
 const SAMPLE = { name: "김제로", track: "이직", stage: "mid", concern: 2, answers: { st: [1, 2, 1], goal: [0, 1, 2], piv: [1, 1, 2], act: [2, 2, 1] } };
@@ -568,11 +571,11 @@ function buildRow() {
   const scores = AXES.map(a => ({ a, score: axisScore(a) }));
   const total = Math.round(scores.reduce((t, x) => t + x.score, 0) / scores.length);
   const weak = [...scores].sort((x, y) => x.score - y.score)[0];
-  const con = concernInfo(), c = code(), b = PROFILE.booking;
+  const con = concernInfo(), c = code(), b = PROFILE.booking || { date: "", time: "", type: "" };
   const row = {
     "제출일시": new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
-    "이름": state.name, "연락처": PROFILE.phone || "", "신청 DB": PROFILE.db,
-    "구분": state.track, "연차": stageLabel(), "상담 예약": `${b.date} ${b.time}`, "상담 형태": b.type,
+    "이름": state.name, "연락처": state.phone || PROFILE.phone || "", "신청 DB": PROFILE.db,
+    "구분": state.track, "연차": stageLabel(), "상담 예약": `${b.date} ${b.time}`.trim(), "상담 형태": b.type,
     "상담 목적": PROFILE.purposes.join(", "),
     "가장 큰 고민": con ? con[0] : "", "추천 서비스": con ? con[1] : "", "추천 프로그램": (() => { const sc = AXES.map(a => ({ name: a.name, score: axisScore(a), high: isHigh(a) })); const t = Math.round(sc.reduce((n, x) => n + x.score, 0) / sc.length); const k = recPlan(sc.filter(x => !x.high), t).key; return PLANS.find(p => p.key === k).name; })(),
     "유형 코드": c, "유형 이름": TYPES[c], "종합 점수": total,
@@ -598,7 +601,7 @@ function showRow() {
   pnl.hidden = false;
 }
 
-const state = { step: "intro", area: 0, name: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
+const state = { step: "intro", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
 const $ = id => document.getElementById(id);
 const app = $("app"), tabsEl = $("tabs"), bottom = $("bottom"), shell = $("app-shell");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -643,7 +646,7 @@ function renderTabs() {
 }
 function render() {
   renderTabs();
-  ({ intro: renderIntro, known: renderKnown, track: renderTrack, stage: renderStage, concern: renderConcern, area: renderArea, name: renderName, report: renderReport })[state.step]();
+  ({ intro: renderIntro, info: renderInfo, known: renderKnown, track: renderTrack, stage: renderStage, concern: renderConcern, area: renderArea, name: renderName, report: renderReport })[state.step]();
   app.classList.remove("fade"); void app.offsetWidth; app.classList.add("fade");
   animate();
 }
@@ -653,7 +656,7 @@ function renderIntro() {
   app.innerHTML = `
     <section class="hero cover">
       <span class="chip">2분 소요</span>
-      <span class="hello">${esc(state.name)}님, 심층 상담을 위해 2분만 함께해 주세요!</span>
+      <span class="hello">${state.name ? esc(state.name) + "님, " : ""}심층 상담을 위해 2분만 함께해 주세요!</span>
       <h1>취업/이직 <em>미니 진단</em></h1>
       <p class="sub"><b>"대기업, 상향 이직 가능할까?"</b>취업/이직 준비의 가장 첫 번째 단계는 "진단"입니다.</p>
       <div class="cover-chart" aria-hidden="true">
@@ -665,7 +668,34 @@ function renderIntro() {
       </div>
     </section>`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">시작하기</button>`;
-  $("go").addEventListener("click", () => go("known"));
+  $("go").addEventListener("click", () => go(LIVE ? "info" : "known"));
+}
+
+function fmtPhone(v) { const d = v.replace(/\D/g, "").slice(0, 11); return d.length < 4 ? d : d.length < 8 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, d.length - 4)}-${d.slice(-4)}`; }
+function renderInfo() {
+  const stages = state.track ? STAGES[state.track] : [];
+  app.innerHTML = `
+    <div class="area-intro"><span class="eyebrow">기본 정보</span><h2>먼저 몇 가지만 알려주세요</h2><p class="muted">예약하신 상담 내역과 맞춰 결과지를 준비해 드려요.</p></div>
+    <section class="card" style="display:grid;gap:16px">
+      <div class="field"><label for="in-name">이름</label><input class="input" id="in-name" autocomplete="name" placeholder="예: 김제로" value="${esc(state.name)}"></div>
+      <div class="field"><label for="in-phone">연락처</label><input class="input" id="in-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" value="${esc(state.phone)}"></div>
+    </section>
+    <section class="card"><p class="q-title" style="margin-top:0">지금 무엇을 준비하고 있나요?</p>
+      <div class="opts">${[["신입 취업", "첫 취업 또는 경력 1년 미만 중고신입"], ["이직", "경력을 살려 회사를 옮기려는 경우"]].map(([v, sub]) => `<button type="button" class="opt" data-track="${v}" aria-pressed="${state.track === v}"><span><b>${v}</b><small style="display:block;font-size:12.5px;color:var(--ink-3);font-weight:500">${sub}</small></span></button>`).join("")}</div>
+    </section>
+    ${state.track ? `<section class="card"><p class="q-title" style="margin-top:0">지금 연차를 알려주세요</p>
+      <div class="opts">${stages.map(([k, l]) => `<button type="button" class="opt" data-stage="${k}" aria-pressed="${state.stage === k}">${l}</button>`).join("")}</div>
+    </section>` : ""}`;
+  bottom.innerHTML = `<button type="button" class="btn primary" id="go">다음</button><button type="button" class="btn sub" id="back">이전으로</button>`;
+  const g = $("go"), n = $("in-name"), ph = $("in-phone");
+  const check = () => { g.disabled = !(state.name && state.phone.replace(/\D/g, "").length >= 10 && state.track && state.stage); };
+  n.addEventListener("input", () => { state.name = n.value.trim(); check(); });
+  ph.addEventListener("input", () => { ph.value = fmtPhone(ph.value); state.phone = ph.value; check(); });
+  app.querySelectorAll("[data-track]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.track; if (state.track !== v) { state.stage = ""; state.concern = null; } state.track = v; renderInfo(); }));
+  app.querySelectorAll("[data-stage]").forEach(b => b.addEventListener("click", () => { if (state.stage !== b.dataset.stage) state.concern = null; state.stage = b.dataset.stage; app.querySelectorAll("[data-stage]").forEach(x => x.setAttribute("aria-pressed", x === b)); check(); }));
+  check();
+  g.addEventListener("click", () => go("concern"));
+  $("back").addEventListener("click", () => go("intro"));
 }
 
 function renderKnown() {
@@ -709,9 +739,9 @@ function renderStage() {
 }
 function renderConcern() {
   const list = CONCERNS[state.stage];
-  choiceScreen({ eyebrow: "심층 질문", title: `<span class="nowrap">"${PROFILE.purposes[0]}"</span>을 남겨주셨어요.<br>그중 지금 가장 큰 고민은 무엇인가요?`, desc: `${stageLabel()} ${state.track} 준비생이 많이 하는 고민을 모았어요. 가장 가까운 하나를 골라 주세요.`,
+  choiceScreen({ eyebrow: "심층 질문", title: PROFILE.purposes[0] ? `<span class="nowrap">"${PROFILE.purposes[0]}"</span>을 남겨주셨어요.<br>그중 지금 가장 큰 고민은 무엇인가요?` : "지금 가장 큰 고민은 무엇인가요?", desc: `${stageLabel()} ${state.track} 준비생이 많이 하는 고민을 모았어요. 가장 가까운 하나를 골라 주세요.`,
     items: list.map((c, i) => [i, c[0], i === PROFILE.suggest ? "앞서 남긴 답변 기준 추천" : ""]), selected: state.concern,
-    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go("known") });
+    onPick: v => state.concern = v, next: () => { state.area = 0; go("area"); }, back: () => go(LIVE ? "info" : "known") });
 }
 
 function renderArea() {
@@ -847,8 +877,7 @@ function renderReport() {
     </section>`; })()}
 
     <p class="foot">12개 자가 응답 문항으로 산출한 참고용 진단이에요. 유형은 축별 점수 56점 이상이면 앞 글자, 미만이면 뒤 글자로 정해요. 판정 기준은 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수예요.</p>`;
-  bottom.innerHTML = `<button type="button" class="btn cta" id="book">예약한 상담 일정 확인하기</button>`;
-  $("book").addEventListener("click", () => toast("시연용 화면이에요. 실제로는 고객의 상담 예약 정보로 연결돼요."));
+  bottom.innerHTML = "";
 }
 
 let tt;
@@ -869,7 +898,7 @@ $("row-close").addEventListener("click", () => $("row-panel").hidden = true);
 document.querySelectorAll("[data-profile]").forEach(b => b.addEventListener("click", () => { menu.hidden = true; applyProfile(PROFILES[+b.dataset.profile]); render(); scrollUp(); toast(`예시 고객을 바꿨어요: ${PROFILE.db}`); }));
 // 시연 메뉴는 주소 끝에 ?demo=1 을 붙였을 때만 보여요
 if (!new URLSearchParams(location.search).has("demo")) mbtn.hidden = true;
-applyProfile(PROFILES[0]);
+applyProfile(LIVE ? LIVE_PROFILE : PROFILES[0]);
 render();
 </script>
 </body>
