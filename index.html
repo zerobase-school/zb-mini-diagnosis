@@ -335,6 +335,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 .dual-bar i.l { left: 0; border-radius: 999px 0 0 999px; }
 .dual-bar i.r { right: 0; border-radius: 0 999px 999px 0; background: linear-gradient(270deg, var(--navy), var(--navy-2)); }
 .dual-bar .mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: var(--card); }
+.dual-pct em { font-style: normal; color: var(--ink-2); font-weight: 600; }
+.dual-pct span:first-child, .dual-pct span:last-child { min-width: 70px; }
+.dual-pct span:last-child { text-align: right; }
 .dual-pct { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .type-desc { display: grid; gap: 8px; background: var(--bg); border-radius: 14px; padding: 14px 16px; }
 .type-desc p { margin: 0; font-size: 14px; }
@@ -636,6 +639,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 function axisScore(a) { const ans = state.answers[a.key] || []; const sum = a.qs.reduce((s, q, i) => s + (ans[i] != null ? q.o[ans[i]][1] : 0), 0); return Math.round(sum / (a.qs.length * 3) * 100); }
 function isHigh(a) { return axisScore(a) >= 56; }
 function code() { return AXES.map(a => isHigh(a) ? a.hi[0] : a.lo[0]).join(""); }
+// 유형 성향이 얼마나 뚜렷한지 (기준선 56점에서 얼마나 떨어져 있는지)
+function strength(score, high) { const d = high ? score - 56 : 56 - score; return d >= 30 ? "매우 뚜렷함" : d >= 15 ? "뚜렷함" : "약간 기울어짐"; }
 function verdict(s) { return s < 45 ? ["low", "보완 필요"] : s < 75 ? ["std", "표준"] : ["high", "우수"]; }
 function weakest(a) { const ans = state.answers[a.key] || []; let idx = 0, min = 99; a.qs.forEach((q, i) => { const v = ans[i] != null ? q.o[ans[i]][1] : 0; if (v < min) { min = v; idx = i; } }); return a.qs[idx]; }
 
@@ -868,7 +873,7 @@ function renderReport() {
       <div class="duals">${scores.map(x => `<div class="dual">
         <div class="dual-top"><span class="${x.high ? "on" : ""}"><b>${x.a.hi[0]}</b> ${x.a.hi[1]}</span><em>${x.name}</em><span class="${x.high ? "" : "on"}">${x.a.lo[1]} <b>${x.a.lo[0]}</b></span></div>
         <div class="dual-bar"><i class="${x.high ? "l" : "r"}" data-w="${x.high ? x.score : 100 - x.score}" style="width:0"></i><span class="mid"></span></div>
-        <div class="dual-pct"><span>${x.score}%</span><span>${100 - x.score}%</span></div>
+        <div class="dual-pct"><span>${x.high ? strength(x.score, true) : ""}</span><em>${x.score}점</em><span>${x.high ? "" : strength(x.score, false)}</span></div>
       </div>`).join("")}</div>
       <div class="type-desc">
         ${strengths.length ? `<p><b>강점</b> ${strengths.map(x => x.a.hi[1]).join(", ")} 성향이에요. ${strengths.map(x => x.name).join(", ")}은 지금 방식을 유지해도 좋아요.</p>` : ""}
