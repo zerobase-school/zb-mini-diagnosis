@@ -235,7 +235,7 @@ function sheetHtml(d, r) {
 
   // 회색 머리띠 (한글 제목 + 영문 부제)
   const band = function (ko, en) {
-    return '<table style="' + T + 'margin-top:12px"><tr><td style="background:' + HEAD + ';padding:4px 7px;font-size:11.5px;font-weight:700;color:' + INK + '">' + ko +
+    return '<table style="' + T + 'margin-top:12px"><tr><td bgcolor="' + HEAD + '" style="background:' + HEAD + ';padding:4px 7px;font-size:11.5px;font-weight:700;color:' + INK + '">' + ko +
       ' <span style="font-size:8.5px;font-weight:400;color:' + INK2 + ';font-style:italic">' + en + '</span></td></tr></table>';
   };
   // 0~100 눈금 막대 (20칸, 보완 필요/표준/우수 구간 음영)
@@ -248,15 +248,16 @@ function sheetHtml(d, r) {
     return cells;
   };
   const segHead = '<td colspan="9" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:#fff;padding:1px 0">보완 필요</td>' +
-    '<td colspan="6" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:' + SEG + ';padding:1px 0">표준</td>' +
+    '<td colspan="6" bgcolor="' + SEG + '" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:' + SEG + ';padding:1px 0">표준</td>' +
     '<td colspan="5" style="font-size:8px;text-align:center;border:0.5pt solid #cfcfcf;background:#fff;padding:1px 0">우수</td>';
   const barCells = function (score) {
     let cells = '';
     const s = Math.max(0, Math.min(100, Number(score) || 0));
     for (let i = 0; i < 20; i++) {
       const v = i * 5, fill = v < s, std = v >= 45 && v < 75;
-      cells += '<td style="width:5%;height:7px;padding:0;font-size:1px;line-height:1px;background:' +
-        (fill ? (s < 45 ? RED : INK) : (std ? SEG : '#fff')) + '"></td>';
+      const col = fill ? (s < 45 ? RED : INK) : (std ? SEG : '#ffffff');
+      // 구글 변환기는 빈 칸의 배경을 무시해서, bgcolor 속성과 공백 문자를 함께 넣음
+      cells += '<td width="5%" height="7" bgcolor="' + col + '" style="width:5%;height:7px;padding:0;font-size:5px;line-height:7px;color:' + col + ';background:' + col + '">&nbsp;</td>';
     }
     return '<td colspan="20" style="padding:6px 0;border-bottom:0.5pt solid #e2e2e2"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
   };
@@ -277,7 +278,7 @@ function sheetHtml(d, r) {
   const formula = band('취업/이직 공식 분석', 'Career Formula Analysis') +
     '<table style="' + T + 'border:0.5pt solid ' + LINE + '"><tr>' +
     '<td style="width:24%;border:0.5pt solid ' + LINE + '"></td>' +
-    ['측정값', '기준 범위', '판정', '유형 글자'].map(function (h) { return '<td style="border:0.5pt solid ' + LINE + ';background:#f6f6f6;font-size:9px;text-align:center;padding:2px">' + h + '</td>'; }).join('') + '</tr>' +
+    ['측정값', '기준 범위', '판정', '유형 글자'].map(function (h) { return '<td bgcolor="#f6f6f6" style="border:0.5pt solid ' + LINE + ';background:#f6f6f6;font-size:9px;text-align:center;padding:2px">' + h + '</td>'; }).join('') + '</tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
       return '<tr><td style="border:0.5pt solid ' + LINE + ';padding:5px 6px;font-size:11px;font-weight:700">' + esc(n) + '</td>' +
@@ -289,11 +290,11 @@ function sheetHtml(d, r) {
 
   // 2) 축별 수준 분석 (눈금 막대)
   const levels = band('축별 수준 분석', 'Formula Level Analysis') +
-    '<table style="' + T + '"><tr><td style="width:22%"></td>' + segHead + '<td style="width:9%"></td></tr>' +
+    '<table style="' + T + '"><tr><td style="width:25%"></td>' + segHead + '<td style="width:9%"></td></tr>' +
     '<tr><td></td>' + scaleHead() + '<td></td></tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
-      return '<tr><td style="font-size:10.5px;font-weight:700;padding:6px 4px 6px 0;border-bottom:0.5pt solid #e2e2e2">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
+      return '<tr><td style="white-space:nowrap;font-size:10.5px;font-weight:700;padding:6px 4px 6px 0;border-bottom:0.5pt solid #e2e2e2">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
         barCells(a.score) + '<td style="font-size:10.5px;font-weight:700;padding-left:5px;border-bottom:0.5pt solid #e2e2e2;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td></tr>';
     }).join('') + '</table>';
 
@@ -303,7 +304,7 @@ function sheetHtml(d, r) {
     return a.qa.map(function (x, i) {
       const s = x.s === null ? 0 : x.s;
       let cells = '';
-      for (let k = 0; k < 3; k++) cells += '<td style="height:6px;padding:0;font-size:1px;line-height:1px;border-right:2px solid #fff;background:' + (k < s ? (s <= 1 ? RED : INK) : '#e4e4e4') + '"></td>';
+      for (let k = 0; k < 3; k++) { const col = k < s ? (s <= 1 ? RED : INK) : '#e4e4e4'; cells += '<td width="33%" height="6" bgcolor="' + col + '" style="height:6px;padding:0;font-size:5px;line-height:6px;color:' + col + ';border-right:2px solid #fff;background:' + col + '">&nbsp;</td>'; }
       cells = '<td colspan="3" style="width:13%;padding:0 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
       return '<tr>' +
         (i === 0 ? '<td rowspan="3" style="width:16%;font-size:10px;font-weight:700;border-bottom:0.5pt solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
