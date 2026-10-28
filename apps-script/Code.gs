@@ -4,15 +4,16 @@
  * 설치 방법
  * 1. "[취업정보회사] 미니 진단 응답" 시트에서 확장 프로그램 > Apps Script 를 연다.
  * 2. 기본 코드를 지우고 이 파일 내용을 그대로 붙여 넣고 저장한다.
- * 3. 함수 선택 칸에서 testWrite 를 골라 실행한다 (처음 한 번은 권한 승인 필요).
- *    시트에 "테스트" 줄과 PDF 링크가 생기면 정상.
+ * 3. 함수 선택 칸에서 setupPdfTrigger 를 골라 실행한다 (처음 한 번만, 권한 승인 필요).
+ *    1분마다 PDF가 없는 줄을 찾아 결과지를 만드는 자동 실행이 등록된다.
  * 4. 배포 > 배포 관리 > 연필 아이콘 > 버전: 새 버전 > 배포
  *    - 다음 사용자 인증 정보로 실행: 나
  *
  * 동작
  * - 링크에 연락처와 이름이 있으면 [ZB] SD 2.0 시트 DB RAW 탭에서 앞서 남긴 응답을 찾아 진단 페이지에 보여준다.
  * - 진단 페이지가 결과지를 열 때 응답 한 건을 JSON으로 보낸다.
- * - 응답 내용으로 PDF 결과지를 만들어 드라이브 "미니 진단 결과지" 폴더에 저장한다.
+ * - 응답은 바로 시트에 쌓이고, PDF 칸에는 "생성 중"이 들어간다.
+ * - 1분마다 도는 자동 실행(makePendingPdfs)이 PDF 결과지를 만들어 드라이브 "미니 진단 결과지" 폴더에 저장하고 링크로 바꾼다.
  * - 시트 첫 행의 열 이름에 맞춰 한 줄을 추가한다. PDF 링크는 "연락처" 바로 옆 열에 들어간다.
  * - 시트에 없는 항목이 오면 맨 오른쪽에 열을 새로 만든다.
  */
@@ -21,6 +22,7 @@ const SHEET_ID = '1YS72FDuRNgBQVu9uD3x_ZZbTTTndEd4Vef1BUha7k7A'; // [취업정�
 const SHEET_INDEX = 0;                 // 응답을 쌓을 탭 (첫 번째 탭)
 const PDF_COL = '결과지 PDF';          // PDF 링크 열 이름
 const PDF_FOLDER = '미니 진단 결과지';  // PDF를 저장할 폴더 이름 (시트와 같은 위치에 생성)
+const PDF_PENDING = '생성 중';
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -29,13 +31,8 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
 
-    // 1) PDF 결과지 만들기 (실패해도 응답은 저장)
-    try {
-      const url = makePdf(data);
-      data[PDF_COL] = '=HYPERLINK("' + url + '","PDF 보기")';
-    } catch (err) {
-      data[PDF_COL] = 'PDF 생성 실패: ' + String(err);
-    }
+    // 1) PDF는 자동 실행이 1분 안에 만들어 링크로 바꿈
+    data[PDF_COL] = PDF_PENDING;
 
     // 2) 열 준비: 결과지 PDF는 연락처 바로 옆
     let headers = getHeaders(sheet);
@@ -78,6 +75,45 @@ function getHeaders(sheet) {
 }
 
 /* ---------- PDF 결과지 ---------- */
+
+// 자동 실행: PDF 칸이 "생성 중"이거나 실패한 줄을 찾아 PDF를 만들고 링크로 바꾼다
+function makePendingPdfs() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
+    const headers = getHeaders(sheet);
+    const pdfIdx = headers.indexOf(PDF_COL);
+    if (pdfIdx === -1 || sheet.getLastRow() < 2) return;
+    const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getValues();
+    const formulas = sheet.getRange(2, pdfIdx + 1, values.length, 1).getFormulas();
+    let made = 0;
+    for (let i = 0; i < values.length && made < 20; i++) {
+      const cell = String(values[i][pdfIdx]);
+      if (formulas[i][0] || !(cell === PDF_PENDING || cell.indexOf('PDF 생성 실패') === 0)) continue;
+      const data = {};
+      headers.forEach(function (h, j) { const v = values[i][j]; data[h] = v instanceof Date ? Utilities.formatDate(v, 'Asia/Seoul', 'yyyy-MM-dd HH:mm') : v; });
+      const target = sheet.getRange(i + 2, pdfIdx + 1);
+      try {
+        target.setFormula('=HYPERLINK("' + makePdf(data) + '","PDF 보기")');
+      } catch (err) {
+        target.setValue('PDF 생성 실패: ' + String(err));
+      }
+      made++;
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// 편집기에서 한 번만 실행: 1분마다 makePendingPdfs 자동 실행 등록 (이미 있으면 다시 만들지 않음)
+function setupPdfTrigger() {
+  const exists = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'makePendingPdfs'; });
+  if (!exists) ScriptApp.newTrigger('makePendingPdfs').timeBased().everyMinutes(1).create();
+  makePendingPdfs(); // 지금 쌓여 있는 줄도 바로 처리
+  Logger.log('PDF 자동 생성 등록 완료');
+}
+
 
 function makePdf(d) {
   const html = reportHtml(d);
