@@ -1,3 +1,9 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d2483">
 <title>취업/이직 미니 진단</title>
 <style>
 /* Layout: 모바일 퍼스트 앱 셸(반투명 앱바, 세그먼트 탭, 부드러운 카드 스택, 하단 고정 CTA). 데스크톱은 왼쪽 소개 + 폰 프레임 */
@@ -388,6 +394,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 @keyframes fade { from { opacity: .3; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .fade { animation: none; } .gauge-fill, .col .fg, .progress i { transition: none; } }
 </style>
+</head>
+<body>
 
 <div class="layout">
 
@@ -864,3 +872,5 @@ if (!new URLSearchParams(location.search).has("demo")) mbtn.hidden = true;
 applyProfile(PROFILES[0]);
 render();
 </script>
+</body>
+</html>
