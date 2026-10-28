@@ -235,7 +235,7 @@ function sheetHtml(d, r) {
 
   // 회색 머리띠 (한글 제목 + 영문 부제)
   const band = function (ko, en) {
-    return '<table style="' + T + 'margin-top:9px"><tr><td style="background:' + HEAD + ';padding:3px 7px;font-size:11.5px;font-weight:700;color:' + INK + '">' + ko +
+    return '<table style="' + T + 'margin-top:12px"><tr><td style="background:' + HEAD + ';padding:4px 7px;font-size:11.5px;font-weight:700;color:' + INK + '">' + ko +
       ' <span style="font-size:8.5px;font-weight:400;color:' + INK2 + ';font-style:italic">' + en + '</span></td></tr></table>';
   };
   // 0~100 눈금 막대 (20칸, 보완 필요/표준/우수 구간 음영)
@@ -258,7 +258,7 @@ function sheetHtml(d, r) {
       cells += '<td style="width:5%;height:7px;padding:0;font-size:1px;line-height:1px;background:' +
         (fill ? (s < 45 ? RED : INK) : (std ? SEG : '#fff')) + '"></td>';
     }
-    return '<td colspan="20" style="padding:4px 0;border-bottom:0.5pt solid #e2e2e2"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
+    return '<td colspan="20" style="padding:6px 0;border-bottom:0.5pt solid #e2e2e2"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
   };
 
   // ---------- 상단 ----------
@@ -280,7 +280,7 @@ function sheetHtml(d, r) {
     ['측정값', '기준 범위', '판정', '유형 글자'].map(function (h) { return '<td style="border:0.5pt solid ' + LINE + ';background:#f6f6f6;font-size:9px;text-align:center;padding:2px">' + h + '</td>'; }).join('') + '</tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
-      return '<tr><td style="border:0.5pt solid ' + LINE + ';padding:3px 6px;font-size:11px;font-weight:700">' + esc(n) + '</td>' +
+      return '<tr><td style="border:0.5pt solid ' + LINE + ';padding:5px 6px;font-size:11px;font-weight:700">' + esc(n) + '</td>' +
         '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:13px;font-weight:700;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td>' +
         '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:9.5px;color:' + INK2 + '">(45.0 ~ 74.0)</td>' +
         '<td style="border:0.5pt solid ' + LINE + ';text-align:center;font-size:10px">' + esc(a.verdict) + '</td>' +
@@ -293,7 +293,7 @@ function sheetHtml(d, r) {
     '<tr><td></td>' + scaleHead() + '<td></td></tr>' +
     ORDER.map(function (n) {
       const a = byName[n];
-      return '<tr><td style="font-size:10.5px;font-weight:700;padding:4px 4px 4px 0;border-bottom:0.5pt solid #e2e2e2">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
+      return '<tr><td style="font-size:10.5px;font-weight:700;padding:6px 4px 6px 0;border-bottom:0.5pt solid #e2e2e2">' + esc(n) + ' <span style="font-size:8px;font-weight:400;color:' + INK3 + '">(점)</span></td>' +
         barCells(a.score) + '<td style="font-size:10.5px;font-weight:700;padding-left:5px;border-bottom:0.5pt solid #e2e2e2;color:' + (a.score < 45 ? RED : INK) + '">' + a.score + '</td></tr>';
     }).join('') + '</table>';
 
@@ -307,9 +307,9 @@ function sheetHtml(d, r) {
       cells = '<td colspan="3" style="width:13%;padding:0 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '"><table style="' + T + '"><tr>' + cells + '</tr></table></td>';
       return '<tr>' +
         (i === 0 ? '<td rowspan="3" style="width:16%;font-size:10px;font-weight:700;border-bottom:0.5pt solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
-        '<td style="font-size:8.5px;line-height:1.3;color:' + INK2 + ';padding:2px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.q) + '</td>' +
+        '<td style="font-size:8.5px;line-height:1.35;color:' + INK2 + ';padding:4px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.q) + '</td>' +
         cells + '<td style="width:5%;font-size:9px;text-align:right;padding-right:3px;color:' + (x.s !== null && x.s <= 1 ? RED : INK) + ';font-weight:700">' + (x.s === null ? '-' : x.s) + '</td>' +
-        '<td style="width:24%;font-size:8.5px;line-height:1.3;font-weight:700;padding:2px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.a) + '</td></tr>';
+        '<td style="width:24%;font-size:8.5px;line-height:1.35;font-weight:700;padding:4px 4px;border-bottom:0.5pt solid #e6e6e6' + (i === 2 ? ';border-bottom-color:' + LINE : '') + '">' + esc(x.a) + '</td></tr>';
     }).join('');
   }).join('');
   const qa = band('문항별 응답 분석', 'Item Response Analysis') +
@@ -317,17 +317,17 @@ function sheetHtml(d, r) {
 
   // 4) 같은 연차 합격 사례
   const caseBlock = band('같은 연차 합격 사례 (' + esc(r.stage) + ')', 'Placement History') +
-    '<table style="' + T + '">' + (cases.length ? cases.slice(0, 3).map(function (c) {
-      return '<tr><td style="font-size:9.5px;font-weight:700;padding:3px 4px 3px 0;border-bottom:0.5pt solid #e6e6e6;width:38%;vertical-align:top">' + esc(c[0]) + '</td>' +
-        '<td style="font-size:9px;color:' + INK2 + ';padding:3px 4px;border-bottom:0.5pt solid #e6e6e6;width:20%;vertical-align:top">' + esc(c[1]) + '</td>' +
-        '<td style="font-size:9px;padding:3px 0 3px 4px;border-bottom:0.5pt solid #e6e6e6;vertical-align:top">' + esc(c[2]) + '</td></tr>';
+    '<table style="' + T + '">' + (cases.length ? cases.slice(0, 4).map(function (c) {
+      return '<tr><td style="font-size:9.5px;font-weight:700;padding:5px 4px 5px 0;border-bottom:0.5pt solid #e6e6e6;width:38%;vertical-align:top">' + esc(c[0]) + '</td>' +
+        '<td style="font-size:9px;color:' + INK2 + ';padding:5px 4px;border-bottom:0.5pt solid #e6e6e6;width:20%;vertical-align:top">' + esc(c[1]) + '</td>' +
+        '<td style="font-size:9px;padding:5px 0 5px 4px;border-bottom:0.5pt solid #e6e6e6;vertical-align:top">' + esc(c[2]) + '</td></tr>';
     }).join('') : '<tr><td style="font-size:9.5px;color:' + INK2 + '">해당 연차 사례 없음</td></tr>') + '</table>';
 
   const left = top.replace(/^/, '') && (formula + levels + qa + caseBlock);
 
   // ---------- 오른쪽 ----------
   const rbox = function (ko, en, body) {
-    return '<div style="margin-top:9px"><div style="font-size:11px;font-weight:700;border-bottom:0.75pt solid ' + INK + ';padding-bottom:2px">' + ko +
+    return '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;border-bottom:0.75pt solid ' + INK + ';padding-bottom:2px">' + ko +
       ' <span style="font-size:8px;font-weight:400;color:' + INK2 + ';font-style:italic">' + en + '</span></div><div style="padding-top:4px">' + body + '</div></div>';
   };
   const scoreBox = rbox('진단 점수', 'Diagnosis Score',
@@ -354,7 +354,9 @@ function sheetHtml(d, r) {
     '<div style="font-size:9.5px;font-weight:700">' + esc(w.name) + ' (' + w.score + '점)</div><div style="font-size:9px;margin-top:2px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
     '<div style="font-size:9.5px;font-weight:700;margin-top:5px">' + esc(r.stage) + ' 공통 전략</div>' +
     (STAGE_STRATEGY[r.stageKey] || []).map(function (x) { return '<div style="font-size:9px;margin-top:2px">- ' + esc(x) + '</div>'; }).join(''));
-  const right = scoreBox + typeBox + planBox + concernBox + stratBox;
+  const provideBox = rbox(esc(r.plan.name) + ' 제공 내용', 'Program Includes',
+    (r.plan.items || []).map(function (x) { return '<div style="font-size:9px;margin-top:2px">- ' + esc(x) + '</div>'; }).join(''));
+  const right = scoreBox + typeBox + planBox + concernBox + stratBox + provideBox;
 
   // ---------- 2쪽: 상담 진행 가이드 ----------
   const lowQs = [];
