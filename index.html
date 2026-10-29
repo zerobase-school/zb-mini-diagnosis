@@ -57,7 +57,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 /* web: 가운데 폼 한 줄만 */
 .layout { display: block; }
 .side { display: none !important; }
-.app { position: relative; background: var(--bg); width: 100%; max-width: 440px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+.app { position: relative; background: var(--bg); width: 100%; max-width: 440px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 @media (min-width: 600px) {
   html, body { background: #ebecf2; }
   .app { max-width: 520px; box-shadow: 0 0 0 1px var(--line), 0 0 40px rgba(29, 36, 131, .06); }
@@ -409,11 +409,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 .hero.cover .glass .lbl b { font-size: 14px; }
 .hero.cover .glass .ico { width: 30px; height: 30px; }
 /* 가로 흔들림 방지: 화면 밖으로 넘치는 요소 차단, 입력창 자동 확대 방지(16px) */
-html, body { overflow-x: hidden; max-width: 100%; }
+/* overflow-x: hidden 은 iOS에서 하단 고정 버튼(sticky)을 깨뜨려서 clip 사용 */
+html, body { overflow-x: clip; max-width: 100%; }
 .app { overflow-x: clip; }
 svg { max-width: 100%; }
 .input { font-size: 16px; }
 .app[data-step="intro"] .content { padding-bottom: 8px; }
+.app[data-step="intro"] .bottom { position: sticky; bottom: 0; }
 
 /* 추천 프로그램 (홈페이지 노바, 프레스티지 색) */
 .plans2 { display: grid; gap: 12px; }
