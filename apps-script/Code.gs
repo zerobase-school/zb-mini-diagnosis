@@ -124,7 +124,7 @@ function setupPdfTrigger() {
 
 
 function makePdf(d, detail) {
-  const html = detail ? refHtml(d, detail) : reportHtml(d);
+  const html = detail ? cardHtml(d, detail) : reportHtml(d);
   const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
   const blob = htmlToPdf(html).setName(name);
@@ -222,6 +222,133 @@ const AXIS_STRATEGY = {
   '취업/이직 전략': 'Pivot 프레임워크로 지금 강점을 축으로 옮길 경로를 설계하고, 지원 결과 기록으로 탈락 원인을 추적',
   '실전 준비도': '최신 합격 서류와 내 서류를 비교하고, 기업별 면접 복기 자료로 탈락 패턴과 예상 질문을 대비'
 };
+
+/* 카드형 결과지 (2차 레퍼런스: 연회색 바탕, 흰 카드, 남색 유형 카드) */
+function cardHtml(d, r) {
+  const BG = '#f3f4f9', CARD = '#ffffff', BORDER = '#e4e6f0', NAVY = '#1d2483', HERO = '#2f37b4', HERO2 = '#4a52c9',
+    INK = '#16181f', INK2 = '#5a5e70', INK3 = '#9a9eae', LINE = '#e8e9f0', TRACK = '#e9eaf1',
+    RED = '#e0453a', GREEN = '#1fae6f', BLUE = '#6b70e0', PINK_L = '#f8dcdc', LAV_L = '#e3e4fa', MINT_L = '#d6f1e4', SOFT = '#f4f5fb';
+  const F = "font-family:'Noto Sans KR','Noto Sans CJK KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;";
+  const MONO = "font-family:'Roboto Mono','Courier New',monospace;";
+  const T = 'width:100%;border-collapse:collapse;';
+  const byName = {}; r.axes.forEach(function (a) { byName[a.name] = a; });
+  const ORDER = ['업무 구조화', '목표 구체화', '취업/이직 전략', '실전 준비도'].filter(function (n) { return byName[n]; });
+  const w = r.axes[0];
+  const nb = function (col, wd, h) {
+    return '<td width="' + wd + '%" bgcolor="' + col + '" style="width:' + wd + '%;height:' + h + 'px;padding:0;font-size:4px;line-height:' + h + 'px;color:' + col + ';background:' + col + '">&nbsp;</td>';
+  };
+  const card = function (inner, extra) {
+    return '<table style="' + T + 'margin-top:7px"><tr><td bgcolor="' + CARD + '" style="background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:10px 16px;' + (extra || '') + '">' + inner + '</td></tr></table>';
+  };
+  const title = function (ko, en) {
+    return '<table style="' + T + 'margin-bottom:6px"><tr><td style="white-space:nowrap;font-size:13.5px;font-weight:800;color:' + INK + ';width:1%;padding-right:6px">' + ko + '</td>' +
+      '<td style="white-space:nowrap;' + MONO + 'font-size:9.5px;letter-spacing:1.5px;color:' + INK3 + ';width:1%;padding-right:8px">' + en + '</td>' +
+      '<td style="vertical-align:middle"><div style="height:1px;background:' + LINE + ';font-size:1px;line-height:1px">&nbsp;</div></td></tr></table>';
+  };
+
+  // 머리글
+  const head = '<table style="' + T + '"><tr>' +
+    '<td style="font-size:22px;font-weight:900;color:' + NAVY + ';width:62px">제-베</td>' +
+    '<td style="font-size:12px;color:' + INK2 + ';padding-left:10px;border-left:1px solid ' + BORDER + '">취업/이직 미니 진단</td>' +
+    '<td style="text-align:right;' + MONO + 'font-size:10.5px;color:' + INK3 + '">' + esc(String(d['제출일시'] || '').slice(0, 13).replace(/\. /g, '.').replace(/\.$/, '')) + '</td></tr></table>' +
+    '<div style="height:1px;background:' + BORDER + ';font-size:1px;line-height:1px;margin:6px 0 0">&nbsp;</div>';
+
+  // 유형 카드 (남색) + 점수 카드
+  const codeBoxes = '<table style="border-collapse:collapse;margin:6px 0 6px"><tr>' + String(r.code).split('').map(function (ch) {
+    return '<td bgcolor="' + HERO2 + '" style="background:' + HERO2 + ';border:1px solid #7d84e0;border-radius:6px;width:34px;height:34px;text-align:center;color:#fff;font-size:16px;font-weight:800;' + MONO + '">' + esc(ch) + '</td><td style="width:8px"></td>';
+  }).join('') + '</tr></table>';
+  const meta = '<table style="' + T + 'margin-top:8px"><tr>' + [['구분', r.track], ['연차', r.stage], ['종합 점수', r.total + '점']].map(function (x, i) {
+    return (i ? '<td style="width:8px"></td>' : '') + '<td bgcolor="' + HERO2 + '" style="background:' + HERO2 + ';border-radius:6px;padding:6px 10px;vertical-align:top">' +
+      '<div style="font-size:9px;color:#c9ccf5">' + x[0] + '</div><div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px">' + esc(x[1]) + '</div></td>';
+  }).join('') + '</tr></table>';
+  const hero = '<td bgcolor="' + HERO + '" style="width:64%;background:' + HERO + ';border-radius:12px;padding:14px 16px;vertical-align:top">' +
+    '<div style="font-size:10.5px;color:#d5d8fa">' + esc(d['이름']) + '님의 유형</div>' + codeBoxes +
+    '<div style="font-size:19px;font-weight:900;color:#fff">' + esc(r.typeName) + '</div>' + meta + '</td>';
+  const pos = Math.max(1, Math.min(99, r.total));
+  const scoreCard = '<td bgcolor="' + CARD + '" style="background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:14px 16px;vertical-align:top">' +
+    title('진단 점수', 'SCORE') +
+    '<div><span style="font-size:32px;font-weight:900;color:' + INK + '">' + r.total + '</span><span style="' + MONO + 'font-size:14px;color:' + INK3 + '"> /100</span></div>' +
+    '<table style="' + T + 'margin-top:6px"><tr>' + nb(PINK_L, 45, 8) + nb(LAV_L, 30, 8) + nb(MINT_L, 25, 8) + '</tr></table>' +
+    '<table style="' + T + '"><tr>' + nb('#ffffff', pos - 1, 5) + nb(NAVY, 2, 5) + nb('#ffffff', 99 - pos, 5) + '</tr></table>' +
+    '<table style="' + T + MONO + 'font-size:8.5px;color:' + INK3 + '"><tr><td style="width:30%">0</td><td style="width:30%">보완 45</td><td style="width:25%">우수 75</td><td style="text-align:right">100</td></tr></table>' +
+    '<div style="font-size:10px;color:' + INK2 + ';margin-top:6px">4개 축 점수의 평균. 현재 판정 <b style="color:' + NAVY + '">' + esc(r.verdict) + '</b></div></td>';
+  const top = '<table style="' + T + 'margin-top:8px"><tr>' + hero + '<td style="width:8px"></td>' + scoreCard + '</tr></table>';
+
+  // 유형 구성
+  const dual = function (a) {
+    const hi = a.score >= 56, s = Math.max(2, Math.min(98, a.score)), strong = a.strength !== '약간 기울어짐';
+    const col = !strong ? BLUE : hi ? GREEN : RED;
+    const ax = AXIS_LABELS[a.name] || { hi: '', lo: '' };
+    const lab = function (t, on) { return '<span style="font-size:10.5px;' + (on ? 'font-weight:800;color:' + (strong ? (hi ? NAVY : NAVY) : NAVY) : 'color:' + INK3) + '">' + esc(t) + '</span>'; };
+    const bar = hi ? nb(col, s - 1, 7) + nb(INK, 1, 7) + nb(TRACK, 100 - s, 7) : nb(TRACK, s - 1, 7) + nb(INK, 1, 7) + nb(col, 100 - s, 7);
+    return '<table style="' + T + '"><tr><td style="width:34%">' + lab(ax.hi, hi) + '</td>' +
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;color:' + INK + ';background:' + SOFT + ';border:1px solid ' + BORDER + ';border-radius:10px;padding:2px 10px">' + esc(a.name) + '</span></td>' +
+      '<td style="width:34%;text-align:right">' + lab(ax.lo, !hi) + '</td></tr></table>' +
+      '<table style="' + T + 'margin-top:4px"><tr>' + bar + '</tr></table>' +
+      '<table style="' + T + '"><tr><td style="width:34%;font-size:9.5px;color:' + INK2 + '">' + (hi ? esc(a.strength) : '') + '</td>' +
+      '<td style="text-align:center;font-size:12px;font-weight:800;color:' + col + '">' + a.score + '<span style="font-size:9px">점</span></td>' +
+      '<td style="width:34%;text-align:right;font-size:9.5px;color:' + INK2 + '">' + (!hi ? esc(a.strength) : '') + '</td></tr></table>';
+  };
+  const spectrum = card(title('유형 구성', 'TYPE SPECTRUM') + '<table style="' + T + '">' + [[0, 1], [2, 3]].map(function (pair) {
+    return '<tr>' + pair.map(function (i, k) { return '<td style="width:50%;vertical-align:top;padding:' + (k ? '0 0 4px 16px' : '0 16px 4px 0') + '">' + (ORDER[i] ? dual(byName[ORDER[i]]) : '') + '</td>'; }).join('') + '</tr>';
+  }).join('') + '</table>');
+
+  // 고민 + 처방 (두 카드)
+  const concern = title('고민과 추천 서비스', 'CONCERN') + (r.concern
+    ? '<table style="' + T + 'margin-top:10px"><tr>' + nb(NAVY, 1, 58) + '<td style="padding-left:12px;vertical-align:top">' +
+      '<div style="font-size:12.5px;font-weight:800">"' + esc(r.concern.title) + '"</div>' +
+      '<div style="font-size:12px;font-weight:800;color:' + NAVY + ';margin-top:5px">' + esc(r.concern.service) + '</div>' +
+      '<div style="font-size:10px;color:' + INK2 + ';margin-top:2px">' + esc(r.concern.desc) + '</div></td></tr></table>'
+    : '<div style="font-size:10.5px;color:' + INK2 + '">선택한 고민 없음</div>');
+  const presc = title('제로베이스 처방', 'PRESCRIPTION') +
+    '<div style="font-size:12px;font-weight:800">' + esc(w.name) + ' <span style="color:' + (w.score < 45 ? RED : NAVY) + '">' + w.score + '점</span></div>' +
+    '<div style="font-size:10px;color:' + INK2 + ';margin-top:2px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
+    '<div style="font-size:11.5px;font-weight:800;margin-top:6px">' + esc(r.stage) + ' 공통 전략</div>' +
+    '<table style="' + T + 'margin-top:2px">' + (STAGE_STRATEGY[r.stageKey] || []).slice(0, 3).map(function (x) {
+      return '<tr><td style="width:14px;vertical-align:top;font-size:9px;color:' + NAVY + ';padding:1px 0">○</td><td style="font-size:10px;padding:1px 0">' + esc(x) + '</td></tr>';
+    }).join('') + '</table>';
+  const cardTd = function (inner, wd) { return '<td bgcolor="' + CARD + '" style="' + (wd ? 'width:' + wd + ';' : '') + 'background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:10px 16px;vertical-align:top">' + inner + '</td>'; };
+  const mid = '<table style="' + T + 'margin-top:7px"><tr>' + cardTd(concern, '34%') + '<td style="width:8px"></td>' + cardTd(presc) + '</tr></table>';
+
+  // 추천 프로그램
+  const program = card(title('추천 프로그램', 'PROGRAM') +
+    '<table style="' + T + '"><tr><td bgcolor="' + SOFT + '" style="background:' + SOFT + ';border:1px solid #d9dbee;border-radius:10px;padding:10px 14px">' +
+    '<div style="font-size:16px;font-weight:900;color:' + NAVY + '">' + esc(r.plan.name) + '</div>' +
+    '<table style="' + T + 'margin-top:2px"><tr><td style="width:30%;vertical-align:top">' +
+    '<table style="' + T + '"><tr><td style="font-size:10px;color:' + INK2 + ';padding:3px 0;border-top:1px solid ' + BORDER + '">월 납부</td><td style="text-align:right;font-size:14px;font-weight:800;padding:3px 0;border-top:1px solid ' + BORDER + '">' + esc(r.plan.monthly) + '</td></tr>' +
+    '<tr><td style="font-size:10px;color:' + INK2 + ';padding:3px 0;border-top:1px solid ' + BORDER + '">총액</td><td style="text-align:right;font-size:14px;font-weight:800;padding:3px 0;border-top:1px solid ' + BORDER + '">' + esc(r.plan.total) + '</td></tr></table>' +
+    '<div style="text-align:right;' + MONO + 'font-size:8.5px;color:' + INK3 + '">VAT 별도, 무이자 12개월</div></td>' +
+    '<td style="vertical-align:middle;padding:0 16px;font-size:10px;color:' + INK2 + '">' + esc(r.plan.why) + '</td>' +
+    '<td style="width:30%;vertical-align:middle;padding-left:12px;border-left:1px dashed #cfd2e6">' +
+    (r.plan.items || []).map(function (x) { return '<div style="font-size:10px;margin:2px 0"><span style="color:' + GREEN + ';font-weight:700">✓</span> ' + esc(x) + '</div>'; }).join('') +
+    '</td></tr></table></td></tr></table>');
+
+  // 응답 12문항
+  const resp = card(title('응답 문항 12', 'RESPONSES') +
+    '<table style="' + T + '"><tr>' + ['영역', '문항', '점수', '응답'].map(function (h, i) {
+      return '<td bgcolor="' + SOFT + '" style="background:' + SOFT + ';color:' + INK2 + ';font-size:10px;font-weight:700;padding:4px 8px;border-bottom:1px solid ' + BORDER + ';' + (i === 2 ? 'text-align:center;width:36px;' : i === 0 ? 'width:96px;' : i === 3 ? 'width:170px;' : '') + '">' + h + '</td>';
+    }).join('') + '</tr>' +
+    ORDER.map(function (n) {
+      const a = byName[n];
+      return a.qa.map(function (x, i) {
+        const low = x.s !== null && x.s <= 1, bt = 'border-bottom:1px solid ' + (i === 2 ? '#d7d9e6' : LINE) + ';';
+        return '<tr>' + (i === 0 ? '<td rowspan="3" style="font-size:11px;font-weight:800;color:' + NAVY + ';padding:0 8px;border-bottom:1px solid #d7d9e6;border-right:1px solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
+          '<td style="font-size:9px;padding:2px 8px;' + bt + '">' + esc(x.q) + '</td>' +
+          '<td style="text-align:center;' + MONO + 'font-size:11px;font-weight:700;color:' + (low ? RED : INK) + ';' + bt + '">' + (x.s === null ? '-' : x.s) + '</td>' +
+          '<td style="font-size:9px;color:' + INK2 + ';padding:2px 8px;' + bt + '">' + esc(x.a) + '</td></tr>';
+      }).join('');
+    }).join('') + '</table>');
+
+  const foot = '<div style="height:1px;background:' + BORDER + ';font-size:1px;line-height:1px;margin:6px 0 3px">&nbsp;</div>' +
+    '<table style="' + T + '"><tr><td style="font-size:9px;color:' + INK3 + '">신청 DB <span style="color:' + INK2 + '">' + esc(r.db || '-') + '</span>&nbsp;&nbsp;&nbsp; 검사 일시 <span style="color:' + INK2 + '">' + esc(d['제출일시']) + '</span></td>' +
+    '<td style="text-align:right;' + MONO + 'font-size:9px;color:' + INK3 + '">zero-base | 취업정보회사</td></tr></table>';
+
+  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    '@page{size:A4;margin:0}html,body{margin:0;background:' + BG + '}body{' + F + 'color:' + INK + ';line-height:1.45}td,div,span,b{' + F + '}' +
+    '</style></head><body bgcolor="' + BG + '">' +
+    '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:20px 32px 12px">' +
+    head + top + spectrum + mid + program + resp + foot + '</td></tr></table></body></html>';
+}
 
 /* 레퍼런스형 결과지 (제-베 리포트 디자인: 유형, 점수, 유형 구성, 고민, 처방, 추천 프로그램, 응답 12문항) */
 function refHtml(d, r) {
