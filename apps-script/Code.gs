@@ -124,7 +124,7 @@ function setupPdfTrigger() {
 
 
 function makePdf(d, detail) {
-  const html = detail ? sheetHtml(d, detail) : reportHtml(d);
+  const html = detail ? refHtml(d, detail) : reportHtml(d);
   const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
   const blob = htmlToPdf(html).setName(name);
@@ -221,6 +221,150 @@ const AXIS_STRATEGY = {
   '목표 구체화': 'Plan A, B, C 기법으로 연차와 직무 기준 목표를 세우고, 목표 기업별 최근 합격자 조건과 비교해 지원 우선순위 확정',
   '취업/이직 전략': 'Pivot 프레임워크로 지금 강점을 축으로 옮길 경로를 설계하고, 지원 결과 기록으로 탈락 원인을 추적',
   '실전 준비도': '최신 합격 서류와 내 서류를 비교하고, 기업별 면접 복기 자료로 탈락 패턴과 예상 질문을 대비'
+};
+
+/* 레퍼런스형 결과지 (제-베 리포트 디자인: 유형, 점수, 유형 구성, 고민, 처방, 추천 프로그램, 응답 12문항) */
+function refHtml(d, r) {
+  const NAVY = '#1d2483', NAVY2 = '#3a41c4', INK = '#16181f', INK2 = '#55596a', INK3 = '#9a9eae', LINE = '#e3e4ec', TRACK = '#ececf2',
+    RED = '#e0453a', RED_L = '#f9d7d4', LAV = '#7d7fd6', LAV_L = '#dcdcf6';
+  const F = "font-family:'Noto Sans KR','Noto Sans CJK KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;";
+  const MONO = "font-family:'Roboto Mono','Courier New',monospace;";
+  const T = 'width:100%;border-collapse:collapse;';
+  const byName = {}; r.axes.forEach(function (a) { byName[a.name] = a; });
+  const ORDER = ['업무 구조화', '목표 구체화', '취업/이직 전략', '실전 준비도'].filter(function (n) { return byName[n]; });
+  const w = r.axes[0];
+  const nb = function (col, wd, h) { // 색만 칠한 칸 (구글 변환기용: bgcolor + 공백 문자)
+    return '<td width="' + wd + '%" bgcolor="' + col + '" style="width:' + wd + '%;height:' + h + 'px;padding:0;font-size:4px;line-height:' + h + 'px;color:' + col + ';background:' + col + '">&nbsp;</td>';
+  };
+  const secTitle = function (ko, en) {
+    return '<div style="font-size:13.5px;font-weight:800;color:' + INK + '">' + ko + ' <span style="' + MONO + 'font-size:10px;font-weight:400;letter-spacing:1.5px;color:' + INK3 + '">' + en + '</span></div>';
+  };
+  const rule = function (h, col, m) { return '<div style="height:' + h + 'px;background:' + col + ';font-size:1px;line-height:' + h + 'px;margin:' + (m || '0') + '">&nbsp;</div>'; };
+
+  // ---------- 머리글 ----------
+  const head =
+    '<table style="' + T + '"><tr>' +
+    '<td style="font-size:24px;font-weight:900;color:' + NAVY + ';width:70px">제-베</td>' +
+    '<td style="font-size:12.5px;color:' + INK2 + ';padding-left:10px;border-left:1px solid ' + LINE + '">취업/이직 미니 진단</td>' +
+    '<td style="text-align:right;' + MONO + 'font-size:11px;color:' + INK3 + '">' + esc(String(d['제출일시'] || '').slice(0, 13).replace(/\. /g, '.').replace(/\.$/, '')) + '</td></tr></table>' +
+    rule(3, INK, '6px 0 8px');
+
+  // ---------- 유형 + 점수 ----------
+  const metaRow = '<table style="' + T + 'border-top:1px solid ' + LINE + ';margin-top:8px"><tr>' +
+    [['구분', r.track], ['연차', r.stage], ['종합 점수', r.total + '점']].map(function (x, i) {
+      return '<td style="padding:8px 10px 2px ' + (i ? '12px' : '0') + ';' + (i ? 'border-left:1px solid ' + LINE + ';' : '') + 'vertical-align:top">' +
+        '<div style="font-size:9.5px;color:' + INK3 + '">' + x[0] + '</div><div style="font-size:14px;font-weight:800;color:' + INK + ';margin-top:2px">' + esc(x[1]) + '</div></td>';
+    }).join('') + '</tr></table>';
+  const typeBlock = rule(4, NAVY, '0 0 8px') +
+    '<div style="font-size:11px;color:' + INK2 + '">' + esc(d['이름']) + '님의 유형</div>' +
+    '<div style="font-size:32px;font-weight:900;letter-spacing:9px;color:' + NAVY + ';line-height:1.15;margin-top:2px">' + esc(String(r.code).split('').join(' ')) + '</div>' +
+    '<div style="font-size:19px;font-weight:900;color:' + INK + ';margin-top:0">' + esc(r.typeName) + '</div>' + metaRow;
+
+  const pos = Math.max(0, Math.min(100, r.total));
+  const scoreBar = '<table style="' + T + 'margin-top:8px"><tr>' +
+    nb(RED_L, 45, 8) + nb(LAV_L, 30, 8) + nb('#c9cbf2', 25, 8) + '</tr></table>' +
+    '<table style="' + T + '"><tr>' + (pos > 1 ? nb('#ffffff', pos - 1, 6) : '') + nb(NAVY, 2, 6) + (pos < 99 ? nb('#ffffff', 99 - pos, 6) : '') + '</tr></table>' +
+    '<table style="' + T + MONO + 'font-size:8.5px;color:' + INK3 + '"><tr><td style="width:25%">0</td><td style="width:25%">보완 45</td><td style="width:25%;text-align:center">우수 75</td><td style="text-align:right">100</td></tr></table>';
+  const scoreBlock = rule(1, LINE, '0 0 12px') + secTitle('진단 점수', 'SCORE') +
+    '<div style="margin-top:6px"><span style="font-size:34px;font-weight:900;color:' + INK + '">' + r.total + '</span><span style="' + MONO + 'font-size:15px;color:' + INK3 + '">/100</span></div>' +
+    scoreBar + '<div style="font-size:10px;color:' + INK2 + ';margin-top:6px">4개 축 점수의 평균. 현재 판정 <b style="color:' + NAVY + '">' + esc(r.verdict) + '</b></div>';
+
+  // ---------- 유형 구성 ----------
+  const dual = function (a) {
+    const hi = a.score >= 56, s = Math.max(2, Math.min(98, a.score)), strong = a.strength !== '약간 기울어짐';
+    const col = !strong ? LAV : hi ? NAVY : RED;
+    const parts = String(a.side).split(' '); // 예: "S 구조화형"
+    const ax = AXIS_LABELS[a.name] || { hi: '', lo: '' };
+    const left = '<span style="font-size:10.5px;' + (hi ? 'font-weight:800;color:' + col : 'color:' + INK3) + '">' + esc(ax.hi) + '</span>';
+    const right = '<span style="font-size:10.5px;' + (!hi ? 'font-weight:800;color:' + col : 'color:' + INK3) + '">' + esc(ax.lo) + '</span>';
+    const bar = hi
+      ? nb(col, s - 1, 7) + nb(INK, 1, 7) + nb(TRACK, 100 - s, 7)
+      : nb(TRACK, s - 1, 7) + nb(INK, 1, 7) + nb(col, 100 - s, 7);
+    return '<table style="' + T + '"><tr><td style="width:36%">' + left + '</td>' +
+      '<td style="text-align:center"><span style="font-size:10px;font-weight:700;border:1px solid ' + INK + ';padding:2px 9px">' + esc(a.name) + '</span></td>' +
+      '<td style="width:36%;text-align:right">' + right + '</td></tr></table>' +
+      '<table style="' + T + 'margin-top:3px"><tr>' + bar + '</tr></table>' +
+      '<table style="' + T + 'margin-top:1px"><tr><td style="width:36%;font-size:9.5px;color:' + INK2 + '">' + (hi ? esc(a.strength) : '') + '</td>' +
+      '<td style="text-align:center;font-size:12px;font-weight:800;color:' + col + '">' + a.score + '<span style="font-size:9px">점</span></td>' +
+      '<td style="width:36%;text-align:right;font-size:9.5px;color:' + INK2 + '">' + (!hi ? esc(a.strength) : '') + '</td></tr></table>';
+  };
+  const spectrum = rule(1, LINE, '8px 0 6px') + secTitle('유형 구성', 'TYPE SPECTRUM') +
+    '<table style="' + T + 'margin-top:8px">' +
+    [[0, 1], [2, 3]].map(function (pair) {
+      return '<tr>' + pair.map(function (i, k) {
+        return '<td style="width:50%;vertical-align:top;padding:' + (k ? '0 0 3px 18px' : '0 18px 3px 0') + '">' + (ORDER[i] ? dual(byName[ORDER[i]]) : '') + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</table>';
+
+  // ---------- 고민 + 처방 ----------
+  const concern = secTitle('고민과 추천 서비스', 'CONCERN') +
+    (r.concern ? '<table style="' + T + 'margin-top:8px"><tr>' + nb(NAVY, 1, 58) +
+      '<td style="padding-left:14px;vertical-align:top"><div style="font-size:13px;font-weight:800;color:' + INK + '">"' + esc(r.concern.title) + '"</div>' +
+      '<div style="font-size:12.5px;font-weight:800;color:' + NAVY2 + ';margin-top:6px">' + esc(r.concern.service) + '</div>' +
+      '<div style="font-size:10.5px;color:' + INK2 + ';margin-top:3px">' + esc(r.concern.desc) + '</div></td></tr></table>'
+      : '<div style="font-size:11px;color:' + INK2 + ';margin-top:12px">선택한 고민 없음</div>');
+  const presc = secTitle('제로베이스 처방', 'PRESCRIPTION') +
+    '<div style="font-size:12.5px;font-weight:800;margin-top:10px">' + esc(w.name) + ' <span style="color:' + (w.score < 45 ? RED : NAVY) + '">' + w.score + '점</span></div>' +
+    '<div style="font-size:10.5px;color:' + INK2 + ';margin-top:3px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
+    '<div style="font-size:12px;font-weight:800;margin-top:8px">' + esc(r.stage) + ' 공통 전략</div>' +
+    '<table style="' + T + 'margin-top:3px">' + (STAGE_STRATEGY[r.stageKey] || []).slice(0, 3).map(function (x) {
+      return '<tr><td style="width:14px;vertical-align:top;font-size:9px;color:' + NAVY + ';padding:2px 0">●</td><td style="font-size:10px;color:' + INK + ';padding:1px 0">' + esc(x) + '</td></tr>';
+    }).join('') + '</table>';
+  const midRow = rule(1, LINE, '4px 0 8px') + '<table style="' + T + '"><tr>' +
+    '<td style="width:34%;vertical-align:top;padding-right:16px">' + concern + '</td>' +
+    '<td style="vertical-align:top;padding-left:16px">' + presc + '</td></tr></table>';
+
+  // ---------- 추천 프로그램 ----------
+  const items = (r.plan.items || []);
+  const plus = items.slice(-Math.min(2, items.length));
+  const program = rule(1, LINE, '6px 0 6px') + secTitle('추천 프로그램', 'PROGRAM') +
+    '<table style="' + T + 'margin-top:6px;border:2.5px solid ' + INK + '"><tr><td style="padding:8px 14px">' +
+    '<div style="font-size:16px;font-weight:900;color:' + NAVY + '">' + esc(r.plan.name) + '</div>' +
+    '<table style="' + T + 'margin-top:2px"><tr>' +
+    '<td style="width:30%;vertical-align:top">' +
+    '<table style="' + T + '"><tr><td style="font-size:10.5px;color:' + INK2 + ';padding:3px 0;border-top:1px solid ' + LINE + '">월 납부</td><td style="text-align:right;font-size:14px;font-weight:900;padding:2px 0;border-top:1px solid ' + LINE + '">' + esc(r.plan.monthly) + '</td></tr>' +
+    '<tr><td style="font-size:10.5px;color:' + INK2 + ';padding:3px 0;border-top:1px solid ' + LINE + '">총액</td><td style="text-align:right;font-size:14px;font-weight:900;padding:2px 0;border-top:1px solid ' + LINE + '">' + esc(r.plan.total) + '</td></tr></table>' +
+    '<div style="text-align:right;' + MONO + 'font-size:8.5px;color:' + INK3 + '">VAT 별도, 무이자 12개월</div></td>' +
+    '<td style="vertical-align:middle;padding:0 18px;font-size:10.5px;color:' + INK2 + '">' + esc(r.plan.why) + '</td>' +
+    '<td style="width:30%;vertical-align:middle;padding-left:14px;border-left:1px dashed ' + LINE + '">' +
+    items.map(function (x) { return '<div style="font-size:10px;margin:2px 0"><span style="color:' + NAVY + ';font-weight:700">✓</span> ' + esc(x) + '</div>'; }).join('') +
+    '</td></tr></table></td></tr></table>';
+
+  // ---------- 응답 12문항 ----------
+  const resp = rule(1, LINE, '6px 0 6px') + secTitle('응답 문항 12', 'RESPONSES') +
+    '<table style="' + T + 'margin-top:6px"><tr>' +
+    ['영역', '문항', '점수', '응답'].map(function (h, i) {
+      return '<td bgcolor="' + INK + '" style="background:' + INK + ';color:#fff;font-size:10px;font-weight:700;padding:4px 8px;' + (i === 2 ? 'text-align:center;width:36px;' : i === 0 ? 'width:96px;' : i === 3 ? 'width:170px;' : '') + '">' + h + '</td>';
+    }).join('') + '</tr>' +
+    ORDER.map(function (n) {
+      const a = byName[n];
+      return a.qa.map(function (x, i) {
+        const low = x.s !== null && x.s <= 1, bt = 'border-bottom:1px solid ' + (i === 2 ? '#cfd1db' : LINE) + ';';
+        return '<tr>' + (i === 0 ? '<td rowspan="3" style="font-size:11.5px;font-weight:800;color:' + NAVY + ';padding:0 8px;border-bottom:1px solid #cfd1db;border-right:1px solid ' + LINE + ';vertical-align:middle">' + esc(n) + '</td>' : '') +
+          '<td style="font-size:9px;color:' + INK + ';padding:2px 8px;' + bt + '">' + esc(x.q) + '</td>' +
+          '<td style="text-align:center;' + MONO + 'font-size:11px;font-weight:700;color:' + (low ? RED : INK) + ';' + bt + '">' + (x.s === null ? '-' : x.s) + '</td>' +
+          '<td style="font-size:9px;color:' + INK2 + ';padding:2px 8px;' + bt + '">' + esc(x.a) + '</td></tr>';
+      }).join('');
+    }).join('') + '</table>';
+
+  // ---------- 바닥글 ----------
+  const foot = rule(2, INK, '6px 0 4px') +
+    '<table style="' + T + '"><tr><td style="font-size:9.5px;color:' + INK3 + '">신청 DB <span style="color:' + INK2 + '">' + esc(r.db || '-') + '</span>&nbsp;&nbsp;&nbsp; 검사 일시 <span style="color:' + INK2 + '">' + esc(d['제출일시']) + '</span></td>' +
+    '<td style="text-align:right;' + MONO + 'font-size:9.5px;color:' + INK3 + '">zero-base | 취업정보회사</td></tr></table>';
+
+  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+    '@page{size:A4;margin:11mm 12mm}body{' + F + 'color:' + INK + ';margin:0;line-height:1.45}td,div,span,b{' + F + '}' +
+    '</style></head><body>' + head +
+    '<table style="' + T + '"><tr><td style="width:64%;vertical-align:top;padding-right:22px">' + typeBlock + '</td>' +
+    '<td style="vertical-align:top;padding-left:8px">' + scoreBlock + '</td></tr></table>' +
+    spectrum + midRow + program + resp + foot + '</body></html>';
+}
+// 유형 구성 양쪽 이름
+const AXIS_LABELS = {
+  '업무 구조화': { hi: 'S 구조화형', lo: '경험 나열형 E' },
+  '목표 구체화': { hi: 'F 목표 집중형', lo: '탐색형 O' },
+  '취업/이직 전략': { hi: 'P 전략형', lo: '직관형 I' },
+  '실전 준비도': { hi: 'R 실전형', lo: '준비형 D' }
 };
 
 /* 검사지형 결과지 (InBody 결과지처럼 한 장에 수치와 막대를 촘촘히) */
@@ -614,7 +758,6 @@ function reportHtml(d) {
 }
 
 /* ---------- 확인용 ---------- */
-
 /* ===== DB 응답 조회 (여기부터 "DB 응답 조회 끝"까지 통째로 교체) =====
  * 진단 페이지가 이름과 연락처로 앞서 남긴 DB 응답을 불러올 때 사용
  * ?phone=01012345678&name=홍길동 → 연락처가 맞고 이름도 맞는(띄어쓰기, 성 생략 허용) 가장 최근 응답을 돌려준다
@@ -719,6 +862,7 @@ function findIn(sheet, phoneCol, nameCol, want, wantName, build) {
 function authorize() {
   SpreadsheetApp.openById(SHEET_ID).getName();
   SpreadsheetApp.openById(DB_SHEET_ID).getName();
+  CacheService.getScriptCache().put('warm', '1', 60);
   DriveApp.getRootFolder().getName();
   DriveApp.getFileById(SHEET_ID).getName();
   Logger.log('권한 승인 완료');
