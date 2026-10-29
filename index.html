@@ -438,6 +438,16 @@ svg { max-width: 100%; }
 .plan2-why { margin: 6px 18px 16px; padding: 10px 12px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--ink-2); }
 .plan2 > :last-child { margin-bottom: 14px; }
 .confirm h3 { font-size: 17px; line-height: 1.45; margin: 4px 0 6px; word-break: keep-all; }
+
+/* 로딩 화면 */
+.loader { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(243,244,249,.82); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.loader-card { width: min(300px, 82vw); background: var(--card); border-radius: 22px; padding: 26px 22px 22px; display: grid; justify-items: center; gap: 8px; box-shadow: 0 18px 44px rgba(29,36,131,.18); text-align: center; }
+.loader-card b { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px; }
+.loader-card small { font-size: 13px; color: var(--ink-3); min-height: 18px; }
+.spin { width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--lav-2); border-top-color: var(--navy); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-bar { width: 100%; height: 6px; border-radius: 99px; background: var(--lav); overflow: hidden; margin-top: 8px; }
+.loader-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--navy-2); transition: width .4s ease; }
 </style>
 </head>
 <body>
@@ -468,6 +478,7 @@ svg { max-width: 100%; }
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="loader" id="loader" hidden><div class="loader-card"><span class="spin"></span><b id="loader-msg"></b><small id="loader-sub"></small><div class="loader-bar"><i id="loader-fill"></i></div></div></div>
 <div class="row-panel" id="row-panel" hidden role="dialog" aria-label="시트로 보낼 데이터">
   <div class="row-inner">
     <div class="score-row"><h3 style="margin:0">시트로 보낼 데이터</h3><button type="button" class="demo-btn" id="row-close">닫기</button></div>
@@ -536,25 +547,29 @@ const STAGES = {
 const CONCERNS = {
   /* 단계별로 겹치지 않게: 방향 설정 / 서류 / 면접, 필기 / 지원 기회와 일정 / 직무 전환 */
   new: [
+    ["대기업, 중견기업 등 더 좋은 기업에 취업하고 싶은데 방법을 모르겠어요", "대기업 취업 전략 컨설팅", "목표 기업 최근 합격자 데이터로 스펙과 경험의 부족한 부분을 짚고 지원 전략을 세워요."],
     ["어떤 직무, 기업을 목표로 할지 정하지 못했어요", "1:1 커리어 컨설팅", "직무 적합도를 진단하고 Plan A, B, C를 함께 설정해요."],
     ["서류 전형에서 계속 떨어져요", "서류 컨설팅 + 최신 합격 자소서", "최신 합격 자소서와 비교해 탈락 원인을 찾아요."],
     ["인적성, 면접 전형에서 떨어져요", "면접 코칭 + 인적성 스터디", "합격자 답변 사례와 기업별 모의고사로 탈락 패턴을 짚어요."],
     ["공채 일정과 지원 전략을 혼자 관리하기 어려워요", "대기업 공채 전략 케어", "공채 일정과 기업별 합격 전략을 주차별로 관리해요."]
   ],
   jr: [
+    ["상향 이직(대기업, 중견기업 등)을 하고 싶은데 방법을 모르겠어요", "대기업 이직 전략 컨설팅", "같은 연차 상향 이직 합격 사례로 목표선과 지원 전략을 세워요."],
     ["지금 경력으로 어디까지 갈 수 있을지 모르겠어요", "커리어 포지션 진단 컨설팅", "같은 연차 합격 사례로 현실적인 목표선을 잡아요."],
     ["짧은 경력을 서류에 어떻게 써야 할지 모르겠어요", "경력기술서 컨설팅", "업무를 구조화해 성과 중심 경력기술서로 바꿔요."],
     ["서류는 붙는데 면접에서 떨어져요", "경력직 면접 코칭", "같은 연차 합격자 면접 답변으로 탈락 원인을 짚어요."],
     ["직무를 바꾸고 싶어요", "Pivot 전략 컨설팅", "지금 강점을 축으로 두고 옮길 수 있는 경로를 설계해요."]
   ],
   mid: [
-    ["어느 기업, 어느 포지션으로 옮길지 정하지 못했어요", "대기업 이직 전략 컨설팅", "목표 기업 최근 합격자 데이터로 지원 전략을 세워요."],
+    ["상향 이직(대기업, 중견기업 등)을 하고 싶은데 방법을 모르겠어요", "대기업 이직 전략 컨설팅", "목표 기업 최근 합격자 데이터로 지원 전략을 세워요."],
+    ["어느 기업, 어느 포지션으로 옮길지 정하지 못했어요", "커리어 포지션 진단 컨설팅", "같은 연차 합격 사례로 현실적인 목표선을 잡아요."],
     ["경력기술서에 내 경력이 잘 드러나지 않아요", "경력기술서 컨설팅", "프로젝트 성과를 수치 중심 경력기술서로 다시 구성해요."],
     ["서류는 붙는데 면접, 과제에서 떨어져요", "경력직 면접 코칭", "합격자 면접과 과제 사례로 탈락 패턴을 짚어요."],
     ["조건에 맞는 포지션 자체를 찾기 어려워요", "헤드헌팅 서비스", "공개, 비공개 포지션 중 맞는 자리를 추려 연결해요."],
     ["직무를 바꾸고 싶어요", "Pivot 전략 컨설팅", "쌓아온 경력을 축으로 옮길 수 있는 경로를 설계해요."]
   ],
   sr: [
+    ["대기업, 리더급 포지션으로 상향 이직하고 싶은데 방법을 모르겠어요", "대기업 이직 전략 컨설팅 + 헤드헌팅", "리더급 상향 이직 사례로 지원 전략을 세우고 맞는 포지션을 연결해요."],
     ["다음 커리어 방향을 다시 설계하고 싶어요", "커리어 리디자인 컨설팅", "다음 10년을 기준으로 Plan A, B, C를 다시 세워요."],
     ["리더급 경력기술서와 면접 준비가 막막해요", "경력직 서류, 면접 코칭", "리더급 합격 사례 기준으로 서류와 면접을 다시 설계해요."],
     ["리더급, 비공개 포지션을 찾기 어려워요", "헤드헌팅 서비스", "공개 채용으로 나오지 않는 포지션을 찾아 연결해요."]
@@ -608,12 +623,22 @@ const LINK_STAGE = stageFromLink();
 const LINK_TRACK = LINK_STAGE ? (/^new/.test(LINK_STAGE) ? "신입 취업" : "이직") : "";
 /* 링크의 연락처와 이름으로 앞서 남긴 DB 응답 불러오기 (Apps Script doGet) */
 let dbLookup = null;
+const dbCache = {};
+/* 같은 이름과 연락처는 한 번만 조회 (입력하는 동안 미리 시작해 둔 결과를 그대로 사용) */
+function fetchDb(name, phone) {
+  const key = name.replace(/\s/g, "") + "|" + phone.replace(/\D/g, "");
+  if (dbCache[key]) return dbCache[key];
+  const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`;
+  const once = ms => Promise.race([fetch(u).then(r => r.json()).catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+  dbCache[key] = once(15000).then(res => res && res.ok ? res : once(10000)).then(res => {
+    if (!res || !res.ok) delete dbCache[key]; // 실패하면 다음에 다시 시도
+    return res;
+  });
+  return dbCache[key];
+}
 function lookupDb(name, phone) {
   if (!SHEET_ENDPOINT || !phone || !name) return Promise.resolve(false);
-  const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`;
-  // 첫 요청은 서버가 깨어나는 시간이 있어 넉넉히 기다리고, 실패하면 한 번 더 시도
-  const once = ms => Promise.race([fetch(u).then(r => r.json()).catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
-  return once(15000).then(res => res && res.ok ? res : once(10000)).then(res => {
+  return fetchDb(name, phone).then(res => {
     if (res && res.found && res.fields && res.fields.length) {
       Object.assign(LIVE_PROFILE, { db: res.db || LIVE_PROFILE.db, name: res.name || name, phone, fields: res.fields });
       return true;
@@ -1028,15 +1053,19 @@ function renderInfo() {
   const g = $("go"), n = $("in-name"), ph = $("in-phone");
   const okId = () => state.name && state.phone.replace(/\D/g, "").length >= 10;
   const check = () => { g.disabled = !(okId() && (!askStage || (state.track && state.stage))); };
-  n.addEventListener("input", () => { state.name = n.value.trim(); check(); });
-  ph.addEventListener("input", () => { ph.value = fmtPhone(ph.value); state.phone = ph.value; check(); });
+  let pre;
+  const prefetch = () => { clearTimeout(pre); if (!askStage && okId() && SHEET_ENDPOINT) pre = setTimeout(() => fetchDb(state.name, state.phone), 400); };
+  n.addEventListener("input", () => { state.name = n.value.trim(); check(); prefetch(); });
+  ph.addEventListener("input", () => { ph.value = fmtPhone(ph.value); state.phone = ph.value; check(); prefetch(); });
   app.querySelectorAll("[data-track]").forEach(b => b.addEventListener("click", () => { const v = b.dataset.track; if (state.track !== v) { state.stage = ""; state.concern = null; } state.track = v; renderInfo(); }));
   app.querySelectorAll("[data-stage]").forEach(b => b.addEventListener("click", () => { if (state.stage !== b.dataset.stage) state.concern = null; state.stage = b.dataset.stage; app.querySelectorAll("[data-stage]").forEach(x => x.setAttribute("aria-pressed", x === b)); check(); }));
   check();
   g.addEventListener("click", async () => {
     if (askStage) return go("concern");
-    g.disabled = true; g.textContent = "앞서 남긴 답변을 찾는 중...";
+    g.disabled = true;
+    showLoader("앞서 남기신 답변을 찾고 있어요", ["상담 신청 내역을 확인하는 중", "남기신 답변을 불러오는 중", "질문을 맞춤으로 준비하는 중", "거의 다 됐어요"]);
     const found = await lookupDb(state.name, state.phone);
+    hideLoader();
     if (found) { const ph0 = state.phone; applyProfile(LIVE_PROFILE); state.phone = ph0; return go("known"); }
     if (LINK_STAGE) { state.track = LINK_TRACK; state.stage = LINK_STAGE; return go("concern"); }
     state.infoPhase = "stage"; renderInfo(); scrollUp();
@@ -1251,10 +1280,11 @@ function renderProgram() {
   const g = $("go"); g.disabled = state.price == null;
   app.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => { state.price = +b.dataset.p; app.querySelectorAll("[data-p]").forEach(x => x.setAttribute("aria-pressed", x === b)); g.disabled = false; }));
   g.addEventListener("click", async () => {
-    g.disabled = true; g.textContent = "결과지를 만드는 중...";
+    g.disabled = true;
+    showLoader("결과지를 만들고 있어요", ["진단 결과를 정리하는 중", "결과지를 그리는 중", "상담 담당자에게 전달하는 중"]);
     let pdf = null;
     try { pdf = await Promise.race([makePdfBase64(), new Promise(r => setTimeout(() => r(null), 15000))]); } catch (e) { pdf = null; }
-    submitRow(pdf); go("done");
+    submitRow(pdf); hideLoader(); go("done");
   });
   $("back").addEventListener("click", () => go("report"));
 }
@@ -1268,6 +1298,21 @@ function renderDone() {
     </section>`;
   bottom.innerHTML = "";
 }
+
+/* 기다리는 동안 단계 문구가 바뀌고 막대가 차오름 (끝나면 바로 닫힘) */
+let loaderTimer = null;
+function showLoader(title, steps) {
+  const el = $("loader"), fill = $("loader-fill"), sub = $("loader-sub");
+  $("loader-msg").textContent = title; el.hidden = false;
+  let t = 0; fill.style.width = "6%"; sub.textContent = steps[0];
+  clearInterval(loaderTimer);
+  loaderTimer = setInterval(() => {
+    t += 1;
+    fill.style.width = Math.min(92, 6 + 86 * (1 - Math.exp(-t / 6))) + "%"; // 빠르게 차오르다 천천히
+    sub.textContent = steps[Math.min(steps.length - 1, Math.floor(t / 3))];
+  }, 500);
+}
+function hideLoader() { clearInterval(loaderTimer); $("loader-fill").style.width = "100%"; setTimeout(() => { $("loader").hidden = true; }, 200); }
 
 let tt;
 function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3000); }
