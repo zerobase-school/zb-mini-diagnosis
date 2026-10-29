@@ -238,7 +238,7 @@ function cardHtml(d, r) {
     return '<td width="' + wd + '%" bgcolor="' + col + '" style="width:' + wd + '%;height:' + h + 'px;padding:0;font-size:4px;line-height:' + h + 'px;color:' + col + ';background:' + col + '">&nbsp;</td>';
   };
   const card = function (inner, extra) {
-    return '<table style="' + T + 'margin-top:7px"><tr><td bgcolor="' + CARD + '" style="background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:10px 16px;' + (extra || '') + '">' + inner + '</td></tr></table>';
+    return '<table style="' + T + 'margin-top:8px;page-break-inside:avoid"><tr><td bgcolor="' + CARD + '" style="background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:10px 16px;' + (extra || '') + '">' + inner + '</td></tr></table>';
   };
   const title = function (ko, en) {
     return '<table style="' + T + 'margin-bottom:6px"><tr><td style="white-space:nowrap;font-size:13.5px;font-weight:800;color:' + INK + ';width:1%;padding-right:6px">' + ko + '</td>' +
@@ -304,7 +304,7 @@ function cardHtml(d, r) {
     '<div style="font-size:12px;font-weight:800">' + esc(w.name) + ' <span style="color:' + (w.score < 45 ? RED : NAVY) + '">' + w.score + '점</span></div>' +
     '<div style="font-size:10px;color:' + INK2 + ';margin-top:2px">' + esc(AXIS_STRATEGY[w.name] || '') + '</div>' +
     '<div style="font-size:11.5px;font-weight:800;margin-top:6px">' + esc(r.stage) + ' 공통 전략</div>' +
-    '<table style="' + T + 'margin-top:2px">' + (STAGE_STRATEGY[r.stageKey] || []).slice(0, 3).map(function (x) {
+    '<table style="' + T + 'margin-top:2px">' + (STAGE_STRATEGY[r.stageKey] || []).map(function (x) {
       return '<tr><td style="width:14px;vertical-align:top;font-size:9px;color:' + NAVY + ';padding:1px 0">○</td><td style="font-size:10px;padding:1px 0">' + esc(x) + '</td></tr>';
     }).join('') + '</table>';
   const cardTd = function (inner, wd) { return '<td bgcolor="' + CARD + '" style="' + (wd ? 'width:' + wd + ';' : '') + 'background:' + CARD + ';border:1px solid ' + BORDER + ';border-radius:12px;padding:10px 16px;vertical-align:top">' + inner + '</td>'; };
@@ -323,6 +323,16 @@ function cardHtml(d, r) {
     (r.plan.items || []).map(function (x) { return '<div style="font-size:10px;margin:2px 0"><span style="color:' + GREEN + ';font-weight:700">✓</span> ' + esc(x) + '</div>'; }).join('') +
     '</td></tr></table></td></tr></table>');
 
+  // 고객 응답 상태 (금액 인지 A, B, B-, C / 맞춤 상담 확인)
+  const grade = String(d['금액 인지 구분'] || ''), gradeCol = grade === 'A' ? GREEN : grade === 'C' ? RED : grade ? NAVY : INK3;
+  const status = card(title('상담 준비 정보', 'STATUS') +
+    '<table style="' + T + '"><tr>' +
+    '<td style="width:96px;vertical-align:top;padding:4px 0"><span style="display:inline-block;min-width:34px;text-align:center;font-size:15px;font-weight:900;color:#fff;background:' + gradeCol + ';border-radius:6px;padding:3px 8px">' + esc(grade || '-') + '</span></td>' +
+    '<td style="vertical-align:top;padding:4px 0"><div style="font-size:10px;color:' + INK3 + '">금액 인지</div><div style="font-size:11px;font-weight:700">' + esc(d['금액 인지'] || '응답 전에 진단을 마침') + '</div></td>' +
+    '<td style="width:28%;vertical-align:top;padding:4px 0 4px 12px;border-left:1px solid ' + LINE + '"><div style="font-size:10px;color:' + INK3 + '">맞춤 상담 진행 확인</div><div style="font-size:11px;font-weight:700">' + esc(d['맞춤 상담 확인'] || '미확인') + '</div></td>' +
+    '</tr></table>' +
+    '<div style="font-size:9px;color:' + INK3 + ';margin-top:4px">A 참여 고려, B 상담 후 판단, B- 가족 상의 필요, C 현재 고려 어려움 (사전 설문과 같은 기준)</div>');
+
   // 응답 12문항
   const resp = card(title('응답 문항 12', 'RESPONSES') +
     '<table style="' + T + '"><tr>' + ['영역', '문항', '점수', '응답'].map(function (h, i) {
@@ -339,6 +349,39 @@ function cardHtml(d, r) {
       }).join('');
     }).join('') + '</table>');
 
+  const cases = STAGE_CASES[r.stageKey] || [];
+  const caseCard = card(title('같은 연차 합격 사례 (' + esc(r.stage) + ')', 'PLACEMENTS') +
+    (cases.length ? '<table style="' + T + '"><tr>' + ['합격 결과', '출발점', '제로베이스에서 한 일'].map(function (h, i) {
+      return '<td bgcolor="' + SOFT + '" style="background:' + SOFT + ';color:' + INK2 + ';font-size:10px;font-weight:700;padding:4px 8px;border-bottom:1px solid ' + BORDER + ';' + (i === 0 ? 'width:34%;' : i === 1 ? 'width:20%;' : '') + '">' + h + '</td>';
+    }).join('') + '</tr>' + cases.slice(0, 4).map(function (c) {
+      return '<tr><td style="font-size:10.5px;font-weight:700;padding:5px 8px;border-bottom:1px solid ' + LINE + ';vertical-align:top">' + esc(c[0]) + '</td>' +
+        '<td style="font-size:10px;color:' + INK2 + ';padding:5px 8px;border-bottom:1px solid ' + LINE + ';vertical-align:top">' + esc(c[1]) + '</td>' +
+        '<td style="font-size:10px;padding:5px 8px;border-bottom:1px solid ' + LINE + ';vertical-align:top">' + esc(c[2]) + '</td></tr>';
+    }).join('') + '</table><div style="font-size:9px;color:' + INK3 + ';margin-top:4px">제로베이스 회원 실제 합격 공유 (2026). 상담에서는 조건이 가까운 1~2건을 골라 소개.</div>'
+      : '<div style="font-size:10px;color:' + INK2 + '">해당 연차 사례 없음</div>'));
+
+  const detailCard = card(title('축별 상세 진단', 'DETAIL') + r.axes.map(function (a, i) {
+    const col = a.score < 45 ? RED : a.score >= 75 ? GREEN : NAVY;
+    return '<table style="' + T + (i ? 'margin-top:8px;border-top:1px solid ' + LINE + ';' : '') + 'page-break-inside:avoid"><tr>' +
+      '<td style="width:110px;vertical-align:top;padding-top:' + (i ? '8px' : '0') + '"><div style="font-size:12px;font-weight:800">' + esc(a.name) + '</div>' +
+      '<div style="font-size:16px;font-weight:900;color:' + col + '">' + a.score + '<span style="font-size:10px">점</span> <span style="font-size:10px;font-weight:600;color:' + INK2 + '">' + esc(a.verdict) + '</span></div>' +
+      '<div style="font-size:9.5px;color:' + INK3 + '">' + esc(a.side) + '</div></td>' +
+      '<td style="vertical-align:top;padding:' + (i ? '8px' : '0') + ' 0 0 12px">' +
+      '<div style="font-size:10.5px"><b style="color:' + NAVY + '">진단</b>&nbsp; ' + esc(a.flag) + '</div>' +
+      '<div style="font-size:10.5px;margin-top:3px"><b style="color:' + NAVY + '">함께 볼 부분</b>&nbsp; ' + esc(a.point) + '</div>' +
+      '<div style="font-size:10.5px;margin-top:3px"><b style="color:' + NAVY + '">상담 의제</b>&nbsp; ' + esc((a.locked || []).join(', ')) + '</div>' +
+      '</td></tr></table>';
+  }).join(''));
+
+  const lowQs = [];
+  r.axes.forEach(function (a) { a.qa.forEach(function (x) { if (x.s !== null && x.s <= 1) lowQs.push([a.name, x.q, x.a, x.s]); }); });
+  const lowCard = card(title('상담에서 먼저 확인할 응답', 'CHECK POINTS') +
+    (lowQs.length ? '<table style="' + T + '">' + lowQs.map(function (x) {
+      return '<tr><td style="width:96px;font-size:10px;color:' + INK2 + ';padding:4px 0;border-bottom:1px solid ' + LINE + '">' + esc(x[0]) + '</td>' +
+        '<td style="font-size:10px;padding:4px 8px;border-bottom:1px solid ' + LINE + '">' + esc(x[1]) + '</td>' +
+        '<td style="width:170px;font-size:10px;font-weight:700;color:' + RED + ';padding:4px 0;border-bottom:1px solid ' + LINE + '">' + esc(x[2]) + ' (' + x[3] + '점)</td></tr>';
+    }).join('') + '</table>' : '<div style="font-size:10px;color:' + INK2 + '">1점 이하 응답 없음</div>'));
+
   const foot = '<div style="height:1px;background:' + BORDER + ';font-size:1px;line-height:1px;margin:6px 0 3px">&nbsp;</div>' +
     '<table style="' + T + '"><tr><td style="font-size:9px;color:' + INK3 + '">신청 DB <span style="color:' + INK2 + '">' + esc(r.db || '-') + '</span>&nbsp;&nbsp;&nbsp; 검사 일시 <span style="color:' + INK2 + '">' + esc(d['제출일시']) + '</span></td>' +
     '<td style="text-align:right;' + MONO + 'font-size:9px;color:' + INK3 + '">zero-base | 취업정보회사</td></tr></table>';
@@ -346,8 +389,9 @@ function cardHtml(d, r) {
   return '<!doctype html><html><head><meta charset="utf-8"><style>' +
     '@page{size:A4;margin:0}html,body{margin:0;background:' + BG + '}body{' + F + 'color:' + INK + ';line-height:1.45}td,div,span,b{' + F + '}' +
     '</style></head><body bgcolor="' + BG + '">' +
-    '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:20px 32px 12px">' +
-    head + top + spectrum + mid + program + resp + foot + '</td></tr></table></body></html>';
+    '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:26px 34px 12px">' +
+    head + top + spectrum + mid + program + status + foot +
+    '<div style="page-break-before:always;height:18px;font-size:1px">&nbsp;</div>' + resp + lowCard + caseCard + detailCard + '</td></tr></table></body></html>';
 }
 
 /* 레퍼런스형 결과지 (제-베 리포트 디자인: 유형, 점수, 유형 구성, 고민, 처방, 추천 프로그램, 응답 12문항) */
