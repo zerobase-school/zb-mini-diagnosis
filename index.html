@@ -609,8 +609,9 @@ let dbLookup = null;
 function lookupDb(name, phone) {
   if (!SHEET_ENDPOINT || !phone || !name) return Promise.resolve(false);
   const u = `${SHEET_ENDPOINT}?phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`;
-  const timeout = new Promise(r => setTimeout(() => r(null), 8000));
-  return Promise.race([fetch(u).then(r => r.json()).catch(() => null), timeout]).then(res => {
+  // 첫 요청은 서버가 깨어나는 시간이 있어 넉넉히 기다리고, 실패하면 한 번 더 시도
+  const once = ms => Promise.race([fetch(u).then(r => r.json()).catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+  return once(15000).then(res => res && res.ok ? res : once(10000)).then(res => {
     if (res && res.found && res.fields && res.fields.length) {
       Object.assign(LIVE_PROFILE, { db: res.db || LIVE_PROFILE.db, name: res.name || name, phone, fields: res.fields });
       return true;
@@ -618,6 +619,8 @@ function lookupDb(name, phone) {
     return false;
   });
 }
+/* 페이지가 열리면 조회 서버를 미리 깨워 둠 (이름 입력하는 동안 준비돼서 조회가 빨라짐) */
+function warmUp() { if (LIVE && SHEET_ENDPOINT) { try { fetch(SHEET_ENDPOINT).catch(() => {}); } catch (e) {} } }
 function startLookup() {
   if (!LIVE || !LIVE_PROFILE.phone || !LIVE_PROFILE.name) return;
   dbLookup = lookupDb(LIVE_PROFILE.name, LIVE_PROFILE.phone).then(ok => { if (ok && state.step === "intro") applyProfile(LIVE_PROFILE); return ok; });
@@ -1062,6 +1065,7 @@ document.querySelectorAll("[data-profile]").forEach(b => b.addEventListener("cli
 // 시연 메뉴는 주소 끝에 ?demo=1 을 붙였을 때만 보여요
 if (!new URLSearchParams(location.search).has("demo")) mbtn.hidden = true;
 applyProfile(LIVE ? LIVE_PROFILE : PROFILES[0]);
+warmUp();
 startLookup();
 render();
 </script>

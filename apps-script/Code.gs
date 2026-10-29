@@ -615,12 +615,15 @@ function reportHtml(d) {
 
 /* ---------- 확인용 ---------- */
 
-// 진단 페이지가 링크의 연락처로 앞서 남긴 DB 응답을 불러올 때 사용
-// ?phone=01012345678&name=홍길동 → DB RAW 탭에서 연락처와 이름이 모두 맞는 가장 최근 응답을 돌려준다
-// 연락처만으로는 조회되지 않게 이름까지 맞아야 응답한다 (개인정보 보호)
+/* ===== DB 응답 조회 (여기부터 "DB 응답 조회 끝"까지 통째로 교체) =====
+ * 진단 페이지가 이름과 연락처로 앞서 남긴 DB 응답을 불러올 때 사용
+ * ?phone=01012345678&name=홍길동 → 연락처가 맞고 이름도 맞는(띄어쓰기, 성 생략 허용) 가장 최근 응답을 돌려준다
+ * 빠르게: 연락처 열만 검색해서 해당 줄만 읽고, 한 번 찾은 결과는 10분 동안 기억
+ * 넓게: DB RAW 탭에 없으면 SD 전환콜 탭(10/1~)에서도 찾는다
+ */
 function doGet(e) {
   const p = (e && e.parameter) || {};
-  if (!p.phone) return json({ ok: true, message: '미니 진단 응답 수집 중' });
+  if (!p.phone) return json({ ok: true, message: '미니 진단 응답 수집 중' }); // 페이지가 열릴 때 미리 깨우는 용도로도 호출됨
   try {
     return json(lookupDb(p.phone, p.name || ''));
   } catch (err) {
@@ -630,11 +633,14 @@ function doGet(e) {
 
 const DB_SHEET_ID = '1e7dIDsSq_Ja4bpWOosAgnv_12SY2papfe1Z-IyqNS_4'; // [ZB] SD 2.0
 const DB_TAB = 'DB RAW';
+const SD_TAB = 'SD 전환콜';
 // DB RAW 열 이름 → 화면에 보여줄 이름 (이 순서대로 보여줌)
 const DB_FIELDS = [
   ['current_status', '현재 상황'], ['career_duration', '경력 기간'], ['target_company_size', '목표하는 기업 규모'],
   ['target_industry', '목표하는 산업 분야'], ['education', '최종 학력'], ['age_range', '나이'], ['employment_timing', '희망 취업/이직 시기']
 ];
+// SD 전환콜 열 이름 → 화면에 보여줄 이름
+const SD_FIELDS = [['현재 상태', '현재 상황'], ['현재 경력', '경력 기간'], ['나이', '나이'], ['이직 시기', '희망 취업/이직 시기']];
 
 function normPhone(v) {
   let d = String(v || '').replace(/\D/g, '');
@@ -642,29 +648,72 @@ function normPhone(v) {
   if (/^1[016789]/.test(d)) d = '0' + d;
   return d;
 }
+function normName(v) { return String(v || '').replace(/\s/g, ''); }
+// 띄어쓰기 무시, 성을 빼고 적은 경우(길동 / 홍길동)도 같은 사람으로 봄
+function sameName(a, b) {
+  a = normName(a); b = normName(b);
+  if (!a || !b) return false;
+  return a === b || (Math.min(a.length, b.length) >= 2 && (a.indexOf(b) > -1 || b.indexOf(a) > -1));
+}
+function cleanDb(v) { return String(v || '').replace(/[^\p{L}\p{N}\s\/()·,.~-]/gu, '').trim(); }
 
 function lookupDb(phone, name) {
   const want = normPhone(phone), wantName = String(name).trim();
   if (want.length < 10 || !wantName) return { ok: true, found: false };
-  const values = SpreadsheetApp.openById(DB_SHEET_ID).getSheetByName(DB_TAB).getDataRange().getValues();
-  const h = values[0].map(String), col = function (k) { return h.indexOf(k); };
-  const cPhone = col('phone'), cName = col('name'), cDb = col('survey_name_snapshot'), cAt = col('submitted_at'), cExtra = col('additional_info');
-  for (let r = values.length - 1; r >= 1; r--) { // 아래쪽이 최신
-    const row = values[r];
-    if (normPhone(row[cPhone]) !== want || String(row[cName]).trim() !== wantName) continue;
+  const cache = CacheService.getScriptCache(), ck = 'db_' + want;
+  const hit = cache.get(ck);
+  if (hit) { const r = JSON.parse(hit); return r.found && !sameName(r.name, wantName) ? { ok: true, found: false } : r; }
+
+  const ss = SpreadsheetApp.openById(DB_SHEET_ID);
+  const res = findIn(ss.getSheetByName(DB_TAB), 'phone', 'name', want, wantName, function (h, row) {
     const fields = [];
-    DB_FIELDS.forEach(function (f) { const i = col(f[0]); if (i > -1 && String(row[i]).trim()) fields.push([f[1], String(row[i]).trim()]); });
-    // additional_info 에 JSON으로 들어온 DB별 추가 문항도 함께 보여줌
-    if (cExtra > -1 && String(row[cExtra]).trim()) {
-      try {
-        const extra = JSON.parse(row[cExtra]);
-        Object.keys(extra).forEach(function (k) { const v = extra[k]; if (v !== '' && v !== null) fields.push([k, Array.isArray(v) ? v.join(', ') : String(v)]); });
-      } catch (e) {}
+    DB_FIELDS.forEach(function (f) { const i = h.indexOf(f[0]); if (i > -1 && String(row[i]).trim()) fields.push([f[1], String(row[i]).trim()]); });
+    const ix = h.indexOf('additional_info');
+    if (ix > -1 && String(row[ix]).trim()) {
+      try { const extra = JSON.parse(row[ix]); Object.keys(extra).forEach(function (k) { const v = extra[k]; if (v !== '' && v !== null) fields.push([k, Array.isArray(v) ? v.join(', ') : String(v)]); }); } catch (e) {}
     }
-    return { ok: true, found: true, db: String(row[cDb]).replace(/[^\p{L}\p{N}\s\/()·,.~-]/gu, '').trim(), name: String(row[cName]).trim(), submittedAt: String(row[cAt]), fields: fields };
-  }
-  return { ok: true, found: false };
+    return { db: cleanDb(row[h.indexOf('survey_name_snapshot')]), name: String(row[h.indexOf('name')]).trim(), fields: fields };
+  }) || findIn(ss.getSheetByName(SD_TAB), '전화번호', '이름', want, wantName, function (h, row) {
+    const fields = [];
+    SD_FIELDS.forEach(function (f) { const i = h.indexOf(f[0]); if (i > -1 && String(row[i]).trim()) fields.push([f[1], String(row[i]).trim()]); });
+    return { db: cleanDb(row[h.indexOf('유입 경로')]), name: String(row[h.indexOf('이름')]).trim(), fields: fields };
+  });
+
+  const out = res ? { ok: true, found: true, db: res.db, name: res.name, fields: res.fields } : { ok: true, found: false };
+  if (res) cache.put(ck, JSON.stringify(out), 600);
+  return out;
 }
+
+// 연락처 열에서 번호를 바로 찾아 그 줄만 읽음 (못 찾으면 연락처 열만 읽어 형식 차이까지 비교)
+function findIn(sheet, phoneCol, nameCol, want, wantName, build) {
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const lastCol = sheet.getLastColumn();
+  // SD 전환콜은 1~2행이 머리글일 수 있어 첫 두 줄에서 머리글 찾기
+  let hRow = 1, h = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+  if (h.indexOf(phoneCol) === -1) { hRow = 2; h = sheet.getRange(2, 1, 1, lastCol).getValues()[0].map(String); }
+  const pc = h.indexOf(phoneCol), nc = h.indexOf(nameCol);
+  if (pc === -1 || nc === -1) return null;
+  const n = sheet.getLastRow() - hRow;
+  if (n < 1) return null;
+  const col = sheet.getRange(hRow + 1, pc + 1, n, 1);
+
+  // 1) 빠른 검색: 같은 표기(01012345678, 010-1234-5678)로 바로 찾기
+  let rows = [];
+  [want, want.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3')].forEach(function (q) {
+    col.createTextFinder(q).matchEntireCell(true).findAll().forEach(function (r) { rows.push(r.getRow()); });
+  });
+  // 2) 느린 검색: 앞자리 0 빠짐, +82 등 형식이 다른 경우
+  if (!rows.length) {
+    col.getValues().forEach(function (v, i) { if (normPhone(v[0]) === want) rows.push(hRow + 1 + i); });
+  }
+  rows.sort(function (a, b) { return b - a; }); // 아래쪽이 최신
+  for (let k = 0; k < rows.length; k++) {
+    const row = sheet.getRange(rows[k], 1, 1, lastCol).getValues()[0];
+    if (sameName(row[nc], wantName)) return build(h, row);
+  }
+  return null;
+}
+/* ===== DB 응답 조회 끝 ===== */
 
 // 편집기에서 한 번 실행해 시트와 드라이브 권한을 모두 승인받는 용도
 function authorize() {
