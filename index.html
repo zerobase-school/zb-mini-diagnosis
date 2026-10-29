@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1d2483">
 <title>취업/이직 미니 진단</title>
 <style>
@@ -396,6 +396,46 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--navy-2); ou
 .fade { animation: fade .4s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes fade { from { opacity: .3; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .fade { animation: none; } .gauge-fill, .col .fg, .progress i { transition: none; } }
+
+/* 첫 화면은 스크롤 없이 한 화면에 (차트 크기를 화면 높이에 맞춰 조절) */
+.hero.cover { gap: 10px; padding: 20px 20px 16px; }
+.hero.cover h1 { font-size: 25px; }
+.hero.cover .sub { font-size: 13.5px; line-height: 1.5; }
+.hero.cover .sub b { font-size: 15px; }
+.cover-chart { margin: 0 -8px; }
+.cover-chart svg { height: clamp(100px, calc(100dvh - 475px), 280px); width: auto; max-width: 100%; }
+.hero.cover .glass { padding: 10px 12px; gap: 8px; }
+.hero.cover .glass .lbl { font-size: 13px; line-height: 1.35; }
+.hero.cover .glass .lbl b { font-size: 14px; }
+.hero.cover .glass .ico { width: 30px; height: 30px; }
+/* 가로 흔들림 방지: 화면 밖으로 넘치는 요소 차단, 입력창 자동 확대 방지(16px) */
+html, body { overflow-x: hidden; max-width: 100%; }
+.app { overflow-x: clip; }
+svg { max-width: 100%; }
+.input { font-size: 16px; }
+.app[data-step="intro"] .content { padding-bottom: 8px; }
+
+/* 추천 프로그램 (홈페이지 노바, 프레스티지 색) */
+.plans2 { display: grid; gap: 12px; }
+.plan2 { border-radius: 20px; overflow: hidden; background: var(--card); box-shadow: 0 8px 22px rgba(20,24,60,.08); }
+.plan2-head { position: relative; padding: 18px 18px 16px; color: #fff; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center; }
+.plan2.nova .plan2-head { background: #12b5f2; }
+.plan2.prestige .plan2-head { background: #33cc8a; }
+.plan2-mark { grid-row: span 2; width: 40px; height: 40px; border-radius: 50%; border: 3px solid rgba(255,255,255,.9); display: grid; place-items: center; font-weight: 800; font-size: 20px; }
+.plan2-name { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.plan2-rec { position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 700; background: #fff; border-radius: 999px; padding: 3px 9px; }
+.plan2.nova .plan2-rec { color: #0d8fc2; } .plan2.prestige .plan2-rec { color: #1f9c66; }
+.plan2-price { grid-column: 2; display: grid; }
+.plan2-price small { font-size: 11.5px; opacity: .9; }
+.plan2-price b { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
+.plan2-price span { font-size: 12px; opacity: .9; }
+.plan2-items { list-style: none; margin: 0; padding: 14px 18px 4px; display: grid; gap: 5px; font-size: 14px; color: var(--ink); }
+.plan2-items li::before { content: "•"; margin-right: 8px; color: var(--ink-3); }
+.plan2.nova .plan2-items li.plus { color: #0d8fc2; font-weight: 600; }
+.plan2.prestige .plan2-items li.plus { color: #1f9c66; font-weight: 600; }
+.plan2-why { margin: 6px 18px 16px; padding: 10px 12px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--ink-2); }
+.plan2 > :last-child { margin-bottom: 14px; }
+.confirm h3 { font-size: 17px; line-height: 1.45; margin: 4px 0 6px; word-break: keep-all; }
 </style>
 </head>
 <body>
@@ -466,8 +506,8 @@ const AXES = [
     point: "강점 하나를 축으로 고정하고 나머지를 옮기는 Pivot 방식이 실패 확률을 줄여요. 무작정 많이 지원하는 방식은 통과율이 낮아지기 쉬워요.",
     locked: ["Pivot 프레임워크로 본 내 이동 경로", "지원 결과 기록 기반 전략 수정 포인트", "채용 시기별 지원 타이밍"],
     qs: [
-      { t: "지금 강점 중 무엇을 축으로 두고 옮길지 정해져 있나요?", o: [["축과 바꿀 부분이 명확해요", 3], ["축은 정했어요", 2], ["고민 중이에요", 1], ["생각해 본 적 없어요", 0]],
-        flag: "무엇을 지키고 무엇을 바꿀지 정하지 않으면 지원할수록 방향이 흐려질 수 있어요." },
+      { t: "내 강점을 정리하고, 그걸 바탕으로 목표 산업과 기업에 맞춘 서류를 준비하고 있나요?", o: [["산업, 기업별로 맞춘 서류가 있어요", 3], ["강점은 정리했지만 서류는 하나로 써요", 2], ["강점 정리가 아직 덜 됐어요", 1], ["생각해 본 적 없어요", 0]],
+        flag: "강점이 정리되지 않은 채 같은 서류로 지원하면, 지원할수록 방향이 흐려지고 기업별 적합도가 약하게 보일 수 있어요." },
       { t: "공채, 수시 등 채용 일정을 계획에 맞춰 관리하나요?", o: [["일정표로 관리해요", 3], ["주요 기업만 챙겨요", 2], ["공고가 보이면 지원해요", 1], ["관리하지 않아요", 0]],
         flag: "지원 타이밍을 놓치면 준비가 돼 있어도 기회 자체가 줄어들어요." },
       { t: "지원 결과(서류, 면접 통과율)를 보고 전략을 바꿔본 적 있나요?", o: [["기록하고 바꿔봤어요", 3], ["느낌으로 조정했어요", 2], ["같은 방식으로 계속 지원해요", 1], ["아직 지원 전이에요", 1]],
@@ -492,28 +532,30 @@ const STAGES = {
   "이직": [["jr", "1~3년차"], ["mid", "4~7년차"], ["sr", "8년차 이상"]]
 };
 const CONCERNS = {
+  /* 단계별로 겹치지 않게: 방향 설정 / 서류 / 면접, 필기 / 지원 기회와 일정 / 직무 전환 */
   new: [
-    ["어떤 직무가 맞는지 모르겠어요", "1:1 커리어 컨설팅", "직무 적합도를 진단하고 Plan A, B, C를 함께 설정해요."],
-    ["서류에서 계속 떨어져요", "서류 컨설팅 + 최신 합격 자소서", "최신 합격 자소서와 비교해 탈락 원인을 찾아요."],
-    ["면접에서 자꾸 떨어져요", "면접 코칭", "합격자 답변 사례를 기준으로 탈락 패턴을 짚어요."],
-    ["대기업 공채를 제대로 준비하고 싶어요", "대기업 공채 전략 케어", "공채 일정과 기업별 합격 전략을 주차별로 관리해요."]
+    ["어떤 직무, 기업을 목표로 할지 정하지 못했어요", "1:1 커리어 컨설팅", "직무 적합도를 진단하고 Plan A, B, C를 함께 설정해요."],
+    ["서류 전형에서 계속 떨어져요", "서류 컨설팅 + 최신 합격 자소서", "최신 합격 자소서와 비교해 탈락 원인을 찾아요."],
+    ["인적성, 면접 전형에서 떨어져요", "면접 코칭 + 인적성 스터디", "합격자 답변 사례와 기업별 모의고사로 탈락 패턴을 짚어요."],
+    ["공채 일정과 지원 전략을 혼자 관리하기 어려워요", "대기업 공채 전략 케어", "공채 일정과 기업별 합격 전략을 주차별로 관리해요."]
   ],
   jr: [
     ["지금 경력으로 어디까지 갈 수 있을지 모르겠어요", "커리어 포지션 진단 컨설팅", "같은 연차 합격 사례로 현실적인 목표선을 잡아요."],
-    ["경력기술서를 어떻게 써야 할지 모르겠어요", "경력기술서 컨설팅", "업무를 구조화해 성과 중심 경력기술서로 바꿔요."],
-    ["직무를 바꾸고 싶어요", "Pivot 전략 컨설팅", "지금 강점을 축으로 두고 옮길 수 있는 경로를 설계해요."],
-    ["나에게 맞는 포지션을 찾고 싶어요", "헤드헌팅 서비스", "경력과 조건에 맞는 포지션을 직접 찾아 연결해요."]
+    ["짧은 경력을 서류에 어떻게 써야 할지 모르겠어요", "경력기술서 컨설팅", "업무를 구조화해 성과 중심 경력기술서로 바꿔요."],
+    ["서류는 붙는데 면접에서 떨어져요", "경력직 면접 코칭", "같은 연차 합격자 면접 답변으로 탈락 원인을 짚어요."],
+    ["직무를 바꾸고 싶어요", "Pivot 전략 컨설팅", "지금 강점을 축으로 두고 옮길 수 있는 경로를 설계해요."]
   ],
   mid: [
-    ["연봉과 직급을 올리는 상향 이직을 하고 싶어요", "헤드헌팅 서비스", "처우를 높일 수 있는 포지션을 찾고 지원을 연결해요."],
-    ["대기업으로 옮기고 싶어요", "대기업 이직 전략 컨설팅", "목표 기업 최근 합격자 데이터로 지원 전략을 세워요."],
-    ["맞춤 포지션을 탐색하고 싶어요", "헤드헌팅 서비스", "공개, 비공개 포지션 중 맞는 자리를 추려 드려요."],
+    ["어느 기업, 어느 포지션으로 옮길지 정하지 못했어요", "대기업 이직 전략 컨설팅", "목표 기업 최근 합격자 데이터로 지원 전략을 세워요."],
+    ["경력기술서에 내 경력이 잘 드러나지 않아요", "경력기술서 컨설팅", "프로젝트 성과를 수치 중심 경력기술서로 다시 구성해요."],
+    ["서류는 붙는데 면접, 과제에서 떨어져요", "경력직 면접 코칭", "합격자 면접과 과제 사례로 탈락 패턴을 짚어요."],
+    ["조건에 맞는 포지션 자체를 찾기 어려워요", "헤드헌팅 서비스", "공개, 비공개 포지션 중 맞는 자리를 추려 연결해요."],
     ["직무를 바꾸고 싶어요", "Pivot 전략 컨설팅", "쌓아온 경력을 축으로 옮길 수 있는 경로를 설계해요."]
   ],
   sr: [
-    ["리더급 포지션으로 옮기고 싶어요", "헤드헌팅 서비스", "리더급 포지션을 찾아 연결하고 지원 과정을 함께해요."],
-    ["커리어 방향을 다시 설계하고 싶어요", "커리어 리디자인 컨설팅", "다음 10년을 기준으로 Plan A, B, C를 다시 세워요."],
-    ["공개되지 않은 포지션을 알고 싶어요", "헤드헌팅 서비스", "공개 채용으로 나오지 않는 포지션을 안내해요."]
+    ["다음 커리어 방향을 다시 설계하고 싶어요", "커리어 리디자인 컨설팅", "다음 10년을 기준으로 Plan A, B, C를 다시 세워요."],
+    ["리더급 경력기술서와 면접 준비가 막막해요", "경력직 서류, 면접 코칭", "리더급 합격 사례 기준으로 서류와 면접을 다시 설계해요."],
+    ["리더급, 비공개 포지션을 찾기 어려워요", "헤드헌팅 서비스", "공개 채용으로 나오지 않는 포지션을 찾아 연결해요."]
   ]
 };
 CONCERNS.new2 = CONCERNS.new;
@@ -610,7 +652,8 @@ function buildRow() {
     "가장 큰 고민": con ? con[0] : "", "추천 서비스": con ? con[1] : "", "추천 프로그램": (() => { const sc = AXES.map(a => ({ name: a.name, score: axisScore(a), high: isHigh(a) })); const t = Math.round(sc.reduce((n, x) => n + x.score, 0) / sc.length); const k = recPlan(sc.filter(x => !x.high), t).key; return PLANS.find(p => p.key === k).name; })(),
     "유형 코드": c, "유형 이름": TYPES[c], "종합 점수": total,
     "업무 구조화": scores[0].score, "목표 구체화": scores[1].score, "취업/이직 전략": scores[2].score, "실전 준비도": scores[3].score,
-    "가장 약한 축": weak.a.name, "미리 채운 문항 수": prefillCount()
+    "가장 약한 축": weak.a.name, "미리 채운 문항 수": prefillCount(),
+    "맞춤 상담 확인": state.consultOk ? "확인함" : "", "금액 인지": state.price != null ? PRICE_OPTS[state.price][1] : "", "금액 인지 구분": state.price != null ? PRICE_OPTS[state.price][0] : ""
   };
   AXES.forEach(a => a.qs.forEach((q, i) => { const v = (state.answers[a.key] || [])[i]; row[`${a.short} Q${i + 1}`] = v != null ? q.o[v][0] : ""; }));
   return row;
@@ -640,15 +683,23 @@ function buildReport() {
   };
 }
 let lastSent = null;
+let submitted = false;
 function submitRow() {
+  if (submitted) return;
   const row = buildRow(); lastSent = row;
   const payload = Object.assign({}, row, { _report: JSON.stringify(buildReport()) });
   if (!SHEET_ENDPOINT) { toast("시연 모드라 시트로 보내지 않았어요. 시연 메뉴에서 보낼 데이터를 볼 수 있어요."); return; }
+  submitted = true;
+  const body = JSON.stringify(payload);
   try {
-    fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
-      .catch(() => toast("결과 저장에 실패했어요. 상담에서 다시 확인해 드릴게요."));
+    if (navigator.sendBeacon && navigator.sendBeacon(SHEET_ENDPOINT, new Blob([body], { type: "text/plain;charset=utf-8" }))) return;
   } catch (e) {}
+  try { fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", keepalive: true, headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).catch(() => {}); } catch (e) {}
 }
+/* 결과지까지 본 뒤 금액 질문 전에 나가도 응답은 한 번 저장 */
+function submitOnLeave() { if (state.reachedReport && !submitted && LIVE) submitRow(); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") submitOnLeave(); });
+window.addEventListener("pagehide", submitOnLeave);
 function showRow() {
   const row = lastSent || buildRow();
   const pnl = $("row-panel");
@@ -656,7 +707,7 @@ function showRow() {
   pnl.hidden = false;
 }
 
-const state = { step: "intro", infoPhase: "", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
+const state = { step: "intro", reachedReport: false, consultOk: false, price: null, infoPhase: "", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
 const $ = id => document.getElementById(id);
 const app = $("app"), tabsEl = $("tabs"), bottom = $("bottom"), shell = $("app-shell");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -702,8 +753,9 @@ function renderTabs() {
     <div class="progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="진행률"><i style="width:${pct}%"></i></div></nav>`;
 }
 function render() {
+  shell.dataset.step = state.step;
   renderTabs();
-  ({ intro: renderIntro, info: renderInfo, known: renderKnown, track: renderTrack, stage: renderStage, concern: renderConcern, area: renderArea, name: renderName, report: renderReport })[state.step]();
+  ({ intro: renderIntro, info: renderInfo, known: renderKnown, track: renderTrack, stage: renderStage, concern: renderConcern, area: renderArea, name: renderName, report: renderReport, program: renderProgram, done: renderDone })[state.step]();
   app.classList.remove("fade"); void app.offsetWidth; app.classList.add("fade");
   animate();
 }
@@ -740,8 +792,8 @@ function renderInfo() {
   const stages = state.track ? STAGES[state.track] : [];
   app.innerHTML = `
     <div class="area-intro"><span class="eyebrow">기본 정보</span>
-      <h2>${askStage ? "두 가지만 더 알려주세요" : "이름과 연락처를 알려주세요"}</h2>
-      <p class="muted">${askStage ? "앞서 남기신 답변을 찾지 못했어요. 연차를 알려주시면 바로 시작할게요." : "상담 신청 때 남기신 답변을 찾아서 이어서 진행해 드려요."}</p></div>
+      <h2>${askStage ? "두 가지만 더 알려주세요" : "이름과 연락처를 정확히 알려주세요"}</h2>
+      <p class="muted">${askStage ? "연차에 맞는 질문으로 바로 시작할게요." : "상담 신청 때 입력하신 이름과 연락처와 같아야 남기신 답변을 찾아 이어서 진행해 드려요."}</p></div>
     <section class="card" style="display:grid;gap:16px">
       <div class="field"><label for="in-name">이름</label><input class="input" id="in-name" autocomplete="name" placeholder="예: 김제로" value="${esc(state.name)}"></div>
       <div class="field"><label for="in-phone">연락처</label><input class="input" id="in-phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="010-0000-0000" value="${esc(state.phone)}"></div>
@@ -825,14 +877,14 @@ function renderArea() {
     ${a.qs.map((q, qi) => `<section class="card" role="group" aria-labelledby="qt-${qi}">
       <div class="q-head"><span class="q-no">Q${qi + 1}</span>${(state.pre[a.key] || {})[qi] ? `<span class="pre-tag">앞서 답변함</span>` : ""}</div><p class="q-title" id="qt-${qi}">${q.t}</p>
       ${(state.pre[a.key] || {})[qi] ? `<p class="pre-note">${esc(PROFILE.db)}에서 "${esc(state.pre[a.key][qi][1])}"(이)라고 답하셔서 미리 골라 뒀어요. 다르면 바꿔 주세요.</p>` : ""}
-      <div class="opts">${q.o.map((o, oi) => `<button type="button" class="opt" data-q="${qi}" data-o="${oi}" aria-pressed="${ans[qi] === oi}">${o[0]}</button>`).join("")}</div>
+      <div class="opts">${q.o.map((o, oi) => [o, oi]).sort((x, y) => x[0][1] - y[0][1]).map(([o, oi]) => `<button type="button" class="opt" data-q="${qi}" data-o="${oi}" aria-pressed="${ans[qi] === oi}">${o[0]}</button>`).join("")}</div>
     </section>`).join("")}`;
   const last = state.area === AXES.length - 1;
   bottom.innerHTML = `<button type="button" class="btn primary" id="submit">${last ? "결과지 보기" : `다음: ${AXES[state.area + 1].name}`}</button><button type="button" class="btn sub" id="prev">이전으로</button>`;
   const sub = $("submit"), check = () => sub.disabled = !a.qs.every((_, i) => ans[i] != null);
   check();
   app.querySelectorAll(".opt").forEach(b => b.addEventListener("click", () => { const qi = +b.dataset.q; ans[qi] = +b.dataset.o; app.querySelectorAll(`.opt[data-q="${qi}"]`).forEach(x => x.setAttribute("aria-pressed", x === b)); check(); renderTabs(); }));
-  sub.addEventListener("click", () => { if (last) { if (state.name) { submitRow(); go("report"); } else go("name"); } else { state.area++; go("area"); } });
+  sub.addEventListener("click", () => { if (last) { go(state.name ? "report" : "name"); } else { state.area++; go("area"); } });
   $("prev").addEventListener("click", () => { if (state.area === 0) go("concern"); else { state.area--; go("area"); } });
 }
 
@@ -843,7 +895,7 @@ function renderName() {
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">결과지 보기</button><button type="button" class="btn sub" id="back">이전으로</button>`;
   const g = $("go"), n = $("in-name"), sync = () => { state.name = n.value.trim(); g.disabled = !state.name; };
   n.addEventListener("input", sync); n.addEventListener("keydown", e => { if (e.key === "Enter" && state.name) g.click(); }); sync();
-  g.addEventListener("click", () => { submitRow(); go("report"); });
+  g.addEventListener("click", () => go("report"));
   $("back").addEventListener("click", () => { state.area = AXES.length - 1; go("area"); });
 }
 
@@ -936,21 +988,58 @@ function renderReport() {
       </div>
     </div>
 
-    ${(() => { const rp = recPlan(gaps, total); return `<section class="card prog">
-      <div><span class="eyebrow">${esc(state.name || "고객")}님께 맞는 프로그램</span>
-      <h3>${con ? `"${con[0]}" 고민과 ` : ""}${order[0].name} 보완을 함께 챙길 수 있는 구성이에요</h3></div>
-      <div class="plans">${PLANS.map(p => `<div class="plan ${p.key === rp.key ? "rec" : ""}">
-        ${p.key === rp.key ? `<span class="plan-rec-tag">${esc(state.name || "고객")}님 추천</span>` : ""}
-        <div class="plan-top"><span class="plan-name">${p.name}</span><span class="plan-price"><small>월</small> ${p.monthly}</span></div>
-        <p class="plan-sub">무이자 12개월 할부, 총 ${p.total} (VAT 별도)</p>
-        <ul>${p.items.map(t => `<li>${t}</li>`).join("")}${p.plus.map(t => `<li class="plus">${t}</li>`).join("")}</ul>
-        <div class="pcases"><span class="pcases-h">${p.name} 회원 최근 합격 사례</span>${p.cases.map(([co, role, how]) => `<div><b>${co}</b><span>${role}</span><em>${how}</em></div>`).join("")}${p.quote ? `<q>${p.quote}</q>` : ""}</div>
-        ${p.key === rp.key ? `<p class="plan-reason">${rp.why}</p>` : ""}
-      </div>`).join("")}</div>
-      <p class="muted" style="font-size:13px;margin:0">취업 보장 혜택의 세부 조건과 최종 구성은 상담에서 결과지를 보며 함께 안내해 드려요.</p>
-    </section>`; })()}
+    <section class="card confirm">
+      <span class="eyebrow">상담 전에 확인해 주세요</span>
+      <h3>예약하신 상담은 이 진단지를 바탕으로 ${esc(state.name || "고객")}님께 맞춘 상담으로 진행돼요</h3>
+      <p class="muted" style="margin:0">위에서 가려진 종합 점수, 합격자 비교, 축별 세부 해설은 상담에서 하나씩 짚어 드려요. 확인하셨다면 아래 버튼을 눌러 주세요.</p>
+    </section>
 
     <p class="foot">12개 자가 응답 문항으로 산출한 참고용 진단이에요. 유형은 축별 점수 56점 이상이면 앞 글자, 미만이면 뒤 글자로 정해요. 판정 기준은 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수예요.</p>`;
+  state.reachedReport = true;
+  bottom.innerHTML = `<button type="button" class="btn primary" id="go">네, 확인했어요</button>`;
+  $("go").addEventListener("click", () => { state.consultOk = true; go("program"); });
+}
+
+/* 금액 인지 질문: 사전 설문과 같은 선택지와 구분(A, B, B-, C)을 그대로 사용해 데이터 누적 */
+const PRICE_Q = "당사의 서비스 프로그램 금액대(200만원~700만원)를 인지하신 상태에서 상담 진행이 가능하신가요?";
+const PRICE_OPTS = [
+  ["A", "네, 금액을 인지하고 있으며 상담 및 프로그램 참여도 고려하고 있습니다."],
+  ["B", "금액은 인지했으며, 우선 상담을 통해 판단하고 싶습니다."],
+  ["B-", "금액은 인지했으나, 결정 전 가족/부모님과의 추가적인 상의가 필요합니다."],
+  ["C", "해당 금액대의 프로그램은 현재 고려가 어렵습니다."]
+];
+
+function renderProgram() {
+  const scores = AXES.map(a => ({ a, name: a.name, score: axisScore(a), high: isHigh(a) }));
+  const total = Math.round(scores.reduce((s, x) => s + x.score, 0) / scores.length);
+  const gaps = scores.filter(x => !x.high), rp = recPlan(gaps, total);
+  app.innerHTML = `
+    <div class="area-intro"><span class="eyebrow">추천 프로그램</span><h2>${esc(state.name || "고객")}님께 맞는 프로그램</h2><p class="muted">추천 프로그램에 대한 안내도 예약하신 상담에서 함께 진행돼요.</p></div>
+    <div class="plans2">${PLANS.map(p => `<section class="plan2 ${p.key}">
+      <div class="plan2-head"><span class="plan2-mark">${p.name[0] === "노" ? "N" : "P"}</span><span class="plan2-name">${p.name} 서비스</span>${p.key === rp.key ? `<span class="plan2-rec">${esc(state.name || "고객")}님 추천</span>` : ""}
+        <div class="plan2-price"><small>무이자 12개월 할부</small><b>월 ${p.monthly}</b><span>총 프로그램 비용 ${p.total} (VAT 별도)</span></div></div>
+      <ul class="plan2-items">${p.items.map(t => `<li>${t}</li>`).join("")}${p.plus.map(t => `<li class="plus">${t}</li>`).join("")}</ul>
+      ${p.key === rp.key ? `<p class="plan2-why">${rp.why}</p>` : ""}
+    </section>`).join("")}</div>
+    <section class="card">
+      <span class="eyebrow">마지막 질문</span>
+      <p class="q-title" style="margin-top:6px">${PRICE_Q}</p>
+      <div class="opts">${PRICE_OPTS.map(([g, t], i) => `<button type="button" class="opt" data-p="${i}" aria-pressed="${state.price === i}">${t}</button>`).join("")}</div>
+    </section>`;
+  bottom.innerHTML = `<button type="button" class="btn primary" id="go">제출하기</button><button type="button" class="btn sub" id="back">결과지 다시 보기</button>`;
+  const g = $("go"); g.disabled = state.price == null;
+  app.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => { state.price = +b.dataset.p; app.querySelectorAll("[data-p]").forEach(x => x.setAttribute("aria-pressed", x === b)); g.disabled = false; }));
+  g.addEventListener("click", () => { submitRow(); go("done"); });
+  $("back").addEventListener("click", () => go("report"));
+}
+
+function renderDone() {
+  app.innerHTML = `
+    <section class="hero" style="text-align:center;justify-items:center;padding:36px 22px">
+      <span class="chip" style="justify-self:center">제출 완료</span>
+      <h1 style="font-size:23px">${esc(state.name || "고객")}님의 진단지가<br>상담 담당자에게 전달됐어요</h1>
+      <p class="sub" style="margin:0">예약하신 상담에서 진단지를 바탕으로<br>맞춤형 상담을 진행해 드릴게요.</p>
+    </section>`;
   bottom.innerHTML = "";
 }
 
@@ -965,7 +1054,7 @@ const menu = $("demo-menu"), mbtn = $("demo-btn");
 mbtn.addEventListener("click", () => { menu.hidden = !menu.hidden; mbtn.setAttribute("aria-expanded", !menu.hidden); });
 document.addEventListener("click", e => { if (!menu.hidden && !menu.contains(e.target) && e.target !== mbtn) { menu.hidden = true; mbtn.setAttribute("aria-expanded", "false"); } });
 $("btn-autofill").addEventListener("click", () => { menu.hidden = true; fill(); render(); toast("예시 응답을 채웠어요. 아래 버튼으로 넘기며 시연하세요."); });
-$("btn-jump").addEventListener("click", () => { menu.hidden = true; fill(); submitRow(); go("report"); });
+$("btn-jump").addEventListener("click", () => { menu.hidden = true; fill(); go("report"); });
 $("btn-reset").addEventListener("click", () => { menu.hidden = true; reset(); });
 $("btn-row").addEventListener("click", () => { menu.hidden = true; showRow(); });
 $("row-close").addEventListener("click", () => $("row-panel").hidden = true);
