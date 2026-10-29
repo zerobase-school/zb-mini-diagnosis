@@ -34,9 +34,18 @@ function doPost(e) {
     // 1) PDF는 자동 실행이 1분 안에 만들어 링크로 바꿈
     //    결과지 상세 내용(_report)은 시트 열 대신 스크립트 저장소에 잠시 보관
     const detail = data._report; delete data._report;
+    const pdfB64 = data._pdf; delete data._pdf; // 진단 페이지가 만든 PDF (레퍼런스 디자인)
     data['응답 ID'] = Utilities.getUuid().slice(0, 8);
     if (detail) PropertiesService.getScriptProperties().setProperty('r_' + data['응답 ID'], detail);
     data[PDF_COL] = PDF_PENDING;
+    if (pdfB64) {
+      try {
+        data[PDF_COL] = '=HYPERLINK("' + savePdf(Utilities.base64Decode(pdfB64), data) + '","PDF 보기")';
+      } catch (err) {
+        // 바로 저장이 안 되면 잠시 보관했다가 자동 실행이 저장
+        stashPdf(data['응답 ID'], pdfB64);
+      }
+    }
 
     // 2) 열 준비: 결과지 PDF는 연락처 바로 옆
     let headers = getHeaders(sheet);
@@ -81,6 +90,30 @@ function getHeaders(sheet) {
 /* ---------- PDF 결과지 ---------- */
 
 // 자동 실행: PDF 칸이 "생성 중"이거나 실패한 줄을 찾아 PDF를 만들고 링크로 바꾼다
+// 진단 페이지가 만든 PDF를 드라이브에 저장하고 링크를 돌려줌
+function savePdf(bytes, d) {
+  const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
+    Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
+  const file = getFolder().createFile(Utilities.newBlob(bytes, 'application/pdf', name));
+  try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  return file.getUrl();
+}
+// PDF를 90KB씩 나눠 6시간 동안 캐시에 보관
+function stashPdf(id, b64) {
+  const cache = CacheService.getScriptCache(), size = 90000, n = Math.ceil(b64.length / size), map = { };
+  for (let i = 0; i < n; i++) map['p_' + id + '_' + i] = b64.slice(i * size, (i + 1) * size);
+  map['p_' + id + '_n'] = String(n);
+  cache.putAll(map, 21600);
+}
+function takePdf(id) {
+  const cache = CacheService.getScriptCache(), n = Number(cache.get('p_' + id + '_n') || 0);
+  if (!n) return null;
+  const keys = []; for (let i = 0; i < n; i++) keys.push('p_' + id + '_' + i);
+  const got = cache.getAll(keys); let b64 = '';
+  for (let i = 0; i < n; i++) { if (!got[keys[i]]) return null; b64 += got[keys[i]]; }
+  return b64;
+}
+
 function makePendingPdfs() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return;
@@ -102,7 +135,9 @@ function makePendingPdfs() {
       let detail = null;
       try { detail = JSON.parse(props.getProperty(key) || 'null'); } catch (e) {}
       try {
-        target.setFormula('=HYPERLINK("' + makePdf(data, detail) + '","PDF 보기")');
+        const stashed = takePdf(data['응답 ID']);
+        const url = stashed ? savePdf(Utilities.base64Decode(stashed), data) : makePdf(data, detail);
+        target.setFormula('=HYPERLINK("' + url + '","PDF 보기")');
         props.deleteProperty(key);
       } catch (err) {
         target.setValue('PDF 생성 실패: ' + String(err));
@@ -391,7 +426,7 @@ function cardHtml(d, r) {
     '</style></head><body bgcolor="' + BG + '">' +
     '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:26px 34px 12px">' +
     head + top + spectrum + mid + program + status + foot +
-    '<div style="page-break-before:always;height:18px;font-size:1px">&nbsp;</div>' + resp + lowCard + caseCard + detailCard + '</td></tr></table></body></html>';
+    '<div style="page-break-before:always;height:18px;font-size:1px">&nbsp;</div>' + resp + detailCard + '</td></tr></table></body></html>';
 }
 
 /* 레퍼런스형 결과지 (제-베 리포트 디자인: 유형, 점수, 유형 구성, 고민, 처방, 추천 프로그램, 응답 12문항) */

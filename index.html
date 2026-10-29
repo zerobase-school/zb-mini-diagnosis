@@ -687,19 +687,234 @@ function buildReport() {
     dbAnswers: (PROFILE.fields || []).map(([k, v]) => ({ k, v }))
   };
 }
+/* ===== PDF 결과지 (고객 브라우저에서 레퍼런스 디자인 그대로 그려서 시트로 전송) ===== */
+const STAGE_STRATEGY = {
+  new: ["100문항 진단으로 스펙 위치를 확인하고 목표 기업군 확정", "주차별 대기업 공채 마감 캘린더로 지원 일정 관리", "타깃 기업 비교와 적합도 진단 후 단기, 중기, 장기 실행 루틴 설계", "기업별 인적성 모의고사와 스터디로 필기 대비"],
+  jr: ["업무 로그 속 경험을 문제, 행동, 결과로 정리해 직무 역량과 연결", "중고신입과 경력직 중 유리한 포지셔닝 판단", "같은 연차 실제 합격 자소서와 경력기술서로 1:1 비교 피드백", "1년차 경험도 수치 성과로 바꾸는 성과 수치화 작업"],
+  mid: ["경력 기반 Plan A, B, C 설정 후 대기업, 대형 금융사 등 목표 도메인 확정", "산업 VALUE CHAIN 분석으로 기업별 적합도를 점수화해 우선순위 결정", "마스터 경력기술서, 포트폴리오 완성 프로그램 (노바, 프레스티지 공통)", "상향 이직 시 처우 협상 포인트 정리"],
+  sr: ["리더급, 비공개 포지션은 헤드헌팅으로 연결", "경력기술서를 처음부터 다시 설계하고 사전과제, 다차 면접 대비", "다음 10년 기준 커리어 Plan A, B, C 재설계", "연봉, 직급 처우 협상 전략"]
+};
+STAGE_STRATEGY.new2 = STAGE_STRATEGY.new;
+const AXIS_STRATEGY = {
+  "업무 구조화": "합격 경력기술서의 구조화 패턴과 비교하고, 마스터 경력기술서 프로그램으로 경험을 문제, 행동, 결과 구조로 재작성",
+  "목표 구체화": "Plan A, B, C 기법으로 연차와 직무 기준 목표를 세우고, 목표 기업별 최근 합격자 조건과 비교해 지원 우선순위 확정",
+  "취업/이직 전략": "Pivot 프레임워크로 강점을 축으로 옮길 경로를 설계하고, 지원 결과 기록으로 탈락 원인을 추적",
+  "실전 준비도": "최신 합격 서류와 내 서류를 비교하고, 기업별 면접 복기 자료로 탈락 패턴과 예상 질문을 대비"
+};
+
+function pdfHtml() {
+  const R = buildReport(), row = buildRow();
+  const byKey = {}; AXES.forEach(a => byKey[a.name] = R.axes.find(x => x.name === a.name));
+  const w = R.axes[0];
+  const date = new Date(), ds = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+  const dual = a => {
+    const ax = AXES.find(x => x.name === a.name), hi = a.score >= 56, strong = a.strength !== "약간 기울어짐";
+    const cls = !strong ? "weak" : hi ? "hi" : "lo", s = Math.max(2, Math.min(98, a.score));
+    return `<div class="dual">
+      <div class="dl"><span class="${hi ? "on " + cls : ""}">${ax.hi[0]} ${ax.hi[1]}</span><em>${a.name}</em><span class="${hi ? "" : "on " + cls}">${ax.lo[1]} ${ax.lo[0]}</span></div>
+      <div class="track"><i class="fill ${cls}" style="${hi ? `left:0;width:${s}%` : `left:${s}%;right:0`}"></i><b class="mid"></b><i class="dot ${cls}" style="left:${s}%"></i></div>
+      <div class="dl sm"><span>${hi ? a.strength : ""}</span><strong class="${cls}">${a.score}<small>점</small></strong><span>${hi ? "" : a.strength}</span></div>
+    </div>`;
+  };
+  const grade = row["금액 인지 구분"] || "-";
+  const page1 = `<div class="pg">
+    <header><div><b class="logo">제-베</b><span>취업/이직 미니 진단</span></div><span class="mono">${ds}</span></header>
+    <div class="row top">
+      <section class="hero">
+        <p class="cap">${esc(state.name)}님의 유형</p>
+        <div class="codes">${R.code.split("").map(c => `<span>${c}</span>`).join("")}</div>
+        <h1>${R.typeName}</h1>
+        <div class="metas">${[["구분", R.track], ["연차", R.stage], ["종합 점수", R.total + "점"]].map(([k, v]) => `<div><small>${k}</small><b>${esc(v)}</b></div>`).join("")}</div>
+      </section>
+      <section class="card score">
+        <h2>진단 점수 <em>SCORE</em></h2>
+        <div class="big">${R.total}<span>/100</span></div>
+        <div class="seg"><i class="p"></i><i class="l"></i><i class="m"></i><b class="dot" style="left:${Math.max(2, Math.min(98, R.total))}%"></b></div>
+        <div class="ticks mono"><span>0</span><span style="left:45%">보완 45</span><span style="left:75%">우수 75</span><span style="right:0">100</span></div>
+        <p class="note">4개 축 점수의 평균. 현재 판정 <b>${R.verdict}</b></p>
+      </section>
+    </div>
+    <section class="card"><h2>유형 구성 <em>TYPE SPECTRUM</em></h2><div class="grid2">${AXES.map(a => dual(byKey[a.name])).join("")}</div></section>
+    <div class="row">
+      <section class="card c34"><h2>고민과 추천 서비스 <em>CONCERN</em></h2>
+        ${R.concern ? `<div class="quote"><b>"${R.concern.title}"</b><strong>${R.concern.service}</strong><p>${R.concern.desc}</p></div>` : `<p class="note">선택한 고민 없음</p>`}
+      </section>
+      <section class="card"><h2>제로베이스 처방 <em>PRESCRIPTION</em></h2>
+        <h3>${w.name} <span class="${w.score < 45 ? "red" : "navy"}">${w.score}점</span></h3>
+        <p class="note">${AXIS_STRATEGY[w.name] || ""}</p>
+        <h3 style="margin-top:8px">${R.stage} 공통 전략</h3>
+        <ul class="ring">${(STAGE_STRATEGY[R.stageKey] || []).map(x => `<li>${x}</li>`).join("")}</ul>
+      </section>
+    </div>
+    <section class="card"><h2>추천 프로그램 <em>PROGRAM</em></h2>
+      <div class="prog"><div class="pl"><b class="pname">${R.plan.name}</b>
+        <div class="kv"><span>월 납부</span><b>${R.plan.monthly}</b></div><div class="kv"><span>총액</span><b>${R.plan.total}</b></div><p class="mono vat">VAT 별도, 무이자 12개월</p></div>
+        <p class="why">${R.plan.why}</p>
+        <ul class="chk">${R.plan.items.map(x => `<li>${x}</li>`).join("")}</ul></div>
+    </section>
+    <section class="card st"><h2>상담 준비 정보 <em>STATUS</em></h2>
+      <div class="stat"><span class="gbadge g${grade === "-" ? "none" : grade.replace("-", "m")}">${grade}</span><div><small>금액 인지</small><b>${esc(row["금액 인지"] || "응답 전")}</b></div><div class="sep"><small>맞춤 상담 진행 확인</small><b>${esc(row["맞춤 상담 확인"] || "미확인")}</b></div></div>
+      <p class="note sm">A 참여 고려, B 상담 후 판단, B- 가족 상의 필요, C 현재 고려 어려움 (사전 설문과 같은 기준)</p>
+    </section>
+    <footer><span>신청 DB <b>${esc(R.db || "-")}</b>&nbsp;&nbsp; 검사 일시 <b>${esc(row["제출일시"])}</b></span><span class="mono">zero-base | 취업정보회사</span></footer>
+  </div>`;
+  const page2 = `<div class="pg">
+    <header><div><b class="logo">제-베</b><span>취업/이직 미니 진단</span></div><span class="mono">${esc(state.name)}님 | 상담 준비용</span></header>
+    <section class="card"><h2>응답 문항 12 <em>RESPONSES</em></h2>
+      <table class="resp"><thead><tr><th style="width:96px">영역</th><th>문항</th><th style="width:34px;text-align:center">점수</th><th style="width:170px">응답</th></tr></thead><tbody>
+      ${AXES.map(a => byKey[a.name].qa.map((x, i) => `<tr class="${i === 2 ? "end" : ""}">${i === 0 ? `<td rowspan="3" class="area">${a.name}</td>` : ""}<td>${x.q}</td><td class="sc mono ${x.s !== null && x.s <= 1 ? "red" : ""}">${x.s ?? "-"}</td><td class="ans">${x.a}</td></tr>`).join("")).join("")}
+      </tbody></table>
+    </section>
+    <section class="card"><h2>축별 상세 진단 <em>DETAIL</em></h2>
+      ${R.axes.map(a => { const c = a.score < 45 ? "red" : a.score >= 75 ? "green" : "navy"; return `<div class="det">
+        <div class="dh"><b>${a.name}</b><strong class="${c}">${a.score}<small>점</small></strong><span class="pill ${c}">${a.verdict}</span><span class="side">${a.side}, ${a.strength}</span></div>
+        <div class="dbar"><i class="${c}" style="width:${Math.max(2, a.score)}%"></i></div>
+        <dl><div><dt>진단</dt><dd>${a.flag}</dd></div><div><dt>함께 볼 부분</dt><dd>${a.point}</dd></div><div><dt>상담 의제</dt><dd>${(a.locked || []).join(", ")}</dd></div></dl>
+      </div>`; }).join("")}
+    </section>
+  </div>`;
+  return { page1, page2 };
+}
+
+const PDF_CSS = `
+#pdf-stage .pg { width: 794px; height: 1123px; box-sizing: border-box; padding: 30px 36px; background: #f3f4f9; font-family: var(--font); color: #16181f; letter-spacing: -0.01em; overflow: hidden; }
+#pdf-stage .mono { font-family: "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing: 0.04em; }
+#pdf-stage header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #e3e5ef; font-size: 12px; color: #9a9eae; }
+#pdf-stage header div { display: flex; align-items: center; gap: 12px; color: #5a5e70; font-size: 13px; }
+#pdf-stage header .logo { font-size: 24px; font-weight: 900; color: #1d2483; letter-spacing: -0.04em; padding-right: 12px; border-right: 1px solid #dfe1ea; }
+#pdf-stage .row { display: flex; gap: 10px; margin-top: 10px; }
+#pdf-stage .row > * { margin-top: 0 !important; }
+#pdf-stage .card { flex: 1; background: #fff; border: 1px solid #e6e8f1; border-radius: 14px; padding: 14px 18px; margin-top: 10px; box-shadow: 0 1px 2px rgba(20,24,60,.03); }
+#pdf-stage .c34 { flex: 0 0 34%; }
+#pdf-stage h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14.5px; font-weight: 800; }
+#pdf-stage h2 em { font-style: normal; font-family: "SFMono-Regular", Menlo, monospace; font-size: 10px; font-weight: 400; letter-spacing: .14em; color: #a2a6b6; }
+#pdf-stage h2::after { content: ""; flex: 1; height: 1px; background: #eceef4; }
+#pdf-stage h3 { margin: 0; font-size: 13px; font-weight: 800; }
+#pdf-stage .note { margin: 3px 0 0; font-size: 11px; color: #5a5e70; line-height: 1.55; }
+#pdf-stage .note.sm { font-size: 10px; color: #9a9eae; }
+#pdf-stage .red { color: #e0453a !important; } #pdf-stage .navy { color: #1d2483 !important; } #pdf-stage .green { color: #16a36a !important; }
+#pdf-stage .top .hero { flex: 0 0 64%; box-sizing: border-box; border-radius: 16px; padding: 18px 20px; color: #fff; background: linear-gradient(120deg, #262ea6 0%, #3940bf 55%, #6a71de 100%); box-shadow: 0 8px 20px rgba(38,46,166,.25); }
+#pdf-stage .hero .cap { margin: 0; font-size: 12px; color: rgba(255,255,255,.75); }
+#pdf-stage .codes { display: flex; gap: 10px; margin: 10px 0 10px; }
+#pdf-stage .codes span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 9px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); font-size: 20px; font-weight: 800; font-family: "SFMono-Regular", Menlo, monospace; }
+#pdf-stage .hero h1 { margin: 0 0 12px; font-size: 24px; font-weight: 900; letter-spacing: -0.04em; }
+#pdf-stage .metas { display: flex; gap: 8px; }
+#pdf-stage .metas div { flex: 1; border-radius: 9px; background: rgba(255,255,255,.13); padding: 8px 12px; display: grid; gap: 2px; }
+#pdf-stage .metas small { font-size: 10.5px; color: rgba(255,255,255,.7); }
+#pdf-stage .metas b { font-size: 15px; font-weight: 800; }
+#pdf-stage .score .big { font-size: 42px; font-weight: 900; letter-spacing: -0.03em; line-height: 1.1; }
+#pdf-stage .score .big span { font-size: 17px; font-weight: 500; color: #a2a6b6; margin-left: 4px; font-family: "SFMono-Regular", Menlo, monospace; }
+#pdf-stage .seg { position: relative; display: flex; height: 10px; border-radius: 99px; overflow: visible; margin: 14px 0 6px; }
+#pdf-stage .seg i { display: block; height: 10px; }
+#pdf-stage .seg .p { width: 45%; background: #f8d9d9; border-radius: 99px 0 0 99px; } #pdf-stage .seg .l { width: 30%; background: #e2e3fa; } #pdf-stage .seg .m { width: 25%; background: #d4efe2; border-radius: 0 99px 99px 0; }
+#pdf-stage .seg .dot { position: absolute; top: -2px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #2a32b0; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); box-sizing: border-box; }
+#pdf-stage .ticks { position: relative; height: 14px; font-size: 10px; color: #a2a6b6; }
+#pdf-stage .ticks span { position: absolute; transform: translateX(-30%); } #pdf-stage .ticks span:first-child { left: 0; transform: none; } #pdf-stage .ticks span:last-child { transform: none; }
+#pdf-stage .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 26px; }
+#pdf-stage .dual .dl { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #a2a6b6; }
+#pdf-stage .dual .dl em { font-style: normal; font-size: 11px; font-weight: 700; color: #16181f; padding: 3px 12px; border-radius: 99px; background: #f4f5fb; border: 1px solid #e3e5ef; }
+#pdf-stage .dual .dl .on { font-weight: 800; color: #1d2483; }
+#pdf-stage .dual .dl.sm { font-size: 10.5px; color: #5a5e70; margin-top: 3px; }
+#pdf-stage .dual .dl strong { font-size: 15px; font-weight: 800; } #pdf-stage .dual .dl strong small { font-size: 10px; margin-left: 1px; }
+#pdf-stage .track { position: relative; height: 10px; border-radius: 99px; background: #eceef4; margin-top: 7px; }
+#pdf-stage .track .fill { position: absolute; top: 0; bottom: 0; border-radius: 99px; }
+#pdf-stage .fill.hi { background: linear-gradient(90deg, #12945c, #2ec486); } #pdf-stage .fill.lo { background: linear-gradient(90deg, #d23a30, #f0675a); } #pdf-stage .fill.weak { background: linear-gradient(90deg, #5a60d8, #9a9ef0); }
+#pdf-stage .track .mid { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 2px; background: #fff; }
+#pdf-stage .track .dot { position: absolute; top: -2px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-sizing: border-box; border: 3px solid; }
+#pdf-stage .dot.hi { border-color: #12945c; } #pdf-stage .dot.lo { border-color: #d23a30; } #pdf-stage .dot.weak { border-color: #5a60d8; }
+#pdf-stage strong.hi { color: #12945c; } #pdf-stage strong.lo { color: #e0453a; } #pdf-stage strong.weak { color: #5a60d8; }
+#pdf-stage .quote { border-left: 3px solid #1d2483; padding: 2px 0 2px 14px; margin-top: 14px; display: grid; gap: 4px; }
+#pdf-stage .quote b { font-size: 13.5px; } #pdf-stage .quote strong { font-size: 13px; color: #1d2483; } #pdf-stage .quote p { margin: 0; font-size: 11px; color: #5a5e70; }
+#pdf-stage ul.ring { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 11px; }
+#pdf-stage ul.ring li { position: relative; padding-left: 18px; } #pdf-stage ul.ring li::before { content: ""; position: absolute; left: 0; top: 4px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #2a32b0; }
+#pdf-stage .prog { display: flex; align-items: center; gap: 18px; border-radius: 12px; background: #f4f5fb; border: 1px solid #dfe1f0; padding: 12px 16px; }
+#pdf-stage .pl { flex: 0 0 200px; } #pdf-stage .pname { display: block; font-size: 19px; font-weight: 900; color: #1d2483; margin-bottom: 6px; }
+#pdf-stage .kv { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-top: 1px solid #e3e5ef; font-size: 11px; color: #5a5e70; }
+#pdf-stage .kv b { font-size: 16px; font-weight: 800; color: #16181f; }
+#pdf-stage .vat { margin: 2px 0 0; text-align: right; font-size: 9.5px; color: #a2a6b6; }
+#pdf-stage .why { flex: 1; margin: 0; font-size: 11px; color: #5a5e70; line-height: 1.6; }
+#pdf-stage ul.chk { flex: 0 0 210px; list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 1px dashed #cfd2e6; display: grid; gap: 4px; font-size: 11px; }
+#pdf-stage ul.chk li::before { content: "✓"; color: #16a36a; font-weight: 800; margin-right: 6px; }
+#pdf-stage table.resp { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+#pdf-stage .resp th { text-align: left; font-weight: 700; color: #5a5e70; background: #f4f5fb; padding: 6px 8px; border-bottom: 1px solid #e3e5ef; }
+#pdf-stage .resp td { padding: 3px 8px; border-bottom: 1px solid #eef0f5; }
+#pdf-stage .resp tr.end td { border-bottom-color: #d9dbe7; }
+#pdf-stage .resp td.area { font-size: 12px; font-weight: 800; color: #1d2483; border-right: 1px solid #eef0f5; border-bottom-color: #d9dbe7; }
+#pdf-stage .resp td.sc { text-align: center; font-size: 12px; font-weight: 700; } #pdf-stage .resp td.ans { color: #5a5e70; }
+#pdf-stage footer { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 8px; border-top: 1px solid #e3e5ef; font-size: 10.5px; color: #a2a6b6; }
+#pdf-stage footer b { font-weight: 500; color: #5a5e70; }
+#pdf-stage .det { padding: 9px 0; border-top: 1px solid #eef0f5; } #pdf-stage .det:first-of-type { border-top: 0; padding-top: 2px; }
+#pdf-stage .dh { display: flex; align-items: baseline; gap: 10px; }
+#pdf-stage .dh b { font-size: 15px; font-weight: 800; } #pdf-stage .dh strong { font-size: 20px; font-weight: 900; } #pdf-stage .dh strong small { font-size: 11px; }
+#pdf-stage .pill { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 99px; background: #f4f5fb; }
+#pdf-stage .side { margin-left: auto; font-size: 11px; color: #9a9eae; }
+#pdf-stage .dbar { height: 7px; border-radius: 99px; background: #eceef4; margin: 8px 0 10px; overflow: hidden; }
+#pdf-stage .dbar i { display: block; height: 100%; border-radius: 99px; }
+#pdf-stage .dbar i.red { background: linear-gradient(90deg, #d23a30, #f0675a); } #pdf-stage .dbar i.navy { background: linear-gradient(90deg, #262ea6, #6a71de); } #pdf-stage .dbar i.green { background: linear-gradient(90deg, #12945c, #2ec486); }
+#pdf-stage .det dl { margin: 0; display: grid; gap: 5px; }
+#pdf-stage .det dl div { display: grid; grid-template-columns: 84px 1fr; gap: 10px; font-size: 11.5px; line-height: 1.55; }
+#pdf-stage .det dt { font-weight: 700; color: #3a41c4; } #pdf-stage .det dd { margin: 0; color: #2a2d3a; }
+#pdf-stage .stat { display: flex; align-items: center; gap: 16px; }
+#pdf-stage .stat small { display: block; font-size: 10.5px; color: #9a9eae; } #pdf-stage .stat b { font-size: 12.5px; }
+#pdf-stage .stat .sep { margin-left: auto; padding-left: 16px; border-left: 1px solid #eef0f5; }
+#pdf-stage .gbadge { min-width: 44px; height: 38px; display: grid; place-items: center; border-radius: 10px; color: #fff; font-size: 18px; font-weight: 900; background: #1d2483; }
+#pdf-stage .gbadge.gA { background: #16a36a; } #pdf-stage .gbadge.gC { background: #e0453a; } #pdf-stage .gbadge.gnone { background: #b5b8c6; }
+`;
+
+let pdfLibs = null;
+function loadPdfLibs() {
+  if (pdfLibs) return pdfLibs;
+  const load = src => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  pdfLibs = Promise.all([
+    load("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
+    load("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+  ]);
+  return pdfLibs;
+}
+async function makePdfBase64() {
+  await loadPdfLibs();
+  // 앱 화면 스타일과 섞이지 않도록 보이지 않는 iframe 안에서 결과지를 그림
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;height:2400px;border:0;";
+  document.body.appendChild(frame);
+  try {
+    const fontRule = (document.querySelector("style").textContent.match(/@font-face\s*{[^}]*}/) || [""])[0];
+    const { page1, page2 } = pdfHtml();
+    const doc = frame.contentDocument;
+    doc.open();
+    doc.write(`<!doctype html><html><head><meta charset="utf-8"><style>${fontRule}
+      :root { --font: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+      html, body { margin: 0; padding: 0; }
+      ${PDF_CSS.replace(/#pdf-stage /g, "")}</style></head><body>${page1}${page2}</body></html>`);
+    doc.close();
+    await new Promise(r => setTimeout(r, 300));
+    if (doc.fonts) await doc.fonts.ready;
+    const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true });
+    const pages = doc.querySelectorAll(".pg");
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await window.html2canvas(pages[i], { scale: 2, backgroundColor: "#f3f4f9", logging: false, windowWidth: 794 });
+      if (i) pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, 297);
+    }
+    return pdf.output("datauristring").split(",")[1];
+  } finally { frame.remove(); }
+}
+/* ===== PDF 결과지 끝 ===== */
+
 let lastSent = null;
 let submitted = false;
-function submitRow() {
+function submitRow(pdf) {
   if (submitted) return;
   const row = buildRow(); lastSent = row;
   const payload = Object.assign({}, row, { _report: JSON.stringify(buildReport()) });
+  if (pdf) payload._pdf = pdf;
   if (!SHEET_ENDPOINT) { toast("시연 모드라 시트로 보내지 않았어요. 시연 메뉴에서 보낼 데이터를 볼 수 있어요."); return; }
   submitted = true;
   const body = JSON.stringify(payload);
   try {
-    if (navigator.sendBeacon && navigator.sendBeacon(SHEET_ENDPOINT, new Blob([body], { type: "text/plain;charset=utf-8" }))) return;
+    if (!pdf && navigator.sendBeacon && navigator.sendBeacon(SHEET_ENDPOINT, new Blob([body], { type: "text/plain;charset=utf-8" }))) return;
   } catch (e) {}
-  try { fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", keepalive: true, headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).catch(() => {}); } catch (e) {}
+  try { fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", keepalive: !pdf, headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).catch(() => {}); } catch (e) {}
 }
 /* 결과지까지 본 뒤 금액 질문 전에 나가도 응답은 한 번 저장 */
 function submitOnLeave() { if (state.reachedReport && !submitted && LIVE) submitRow(); }
@@ -1015,6 +1230,7 @@ const PRICE_OPTS = [
 ];
 
 function renderProgram() {
+  loadPdfLibs().catch(() => {});
   const scores = AXES.map(a => ({ a, name: a.name, score: axisScore(a), high: isHigh(a) }));
   const total = Math.round(scores.reduce((s, x) => s + x.score, 0) / scores.length);
   const gaps = scores.filter(x => !x.high), rp = recPlan(gaps, total);
@@ -1034,7 +1250,12 @@ function renderProgram() {
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">제출하기</button><button type="button" class="btn sub" id="back">결과지 다시 보기</button>`;
   const g = $("go"); g.disabled = state.price == null;
   app.querySelectorAll("[data-p]").forEach(b => b.addEventListener("click", () => { state.price = +b.dataset.p; app.querySelectorAll("[data-p]").forEach(x => x.setAttribute("aria-pressed", x === b)); g.disabled = false; }));
-  g.addEventListener("click", () => { submitRow(); go("done"); });
+  g.addEventListener("click", async () => {
+    g.disabled = true; g.textContent = "결과지를 만드는 중...";
+    let pdf = null;
+    try { pdf = await Promise.race([makePdfBase64(), new Promise(r => setTimeout(() => r(null), 15000))]); } catch (e) { pdf = null; }
+    submitRow(pdf); go("done");
+  });
   $("back").addEventListener("click", () => go("report"));
 }
 
