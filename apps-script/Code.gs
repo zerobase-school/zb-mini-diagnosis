@@ -425,7 +425,7 @@ function cardHtml(d, r) {
     '@page{size:A4;margin:0}html,body{margin:0;background:' + BG + '}body{' + F + 'color:' + INK + ';line-height:1.45}td,div,span,b{' + F + '}' +
     '</style></head><body bgcolor="' + BG + '">' +
     '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:26px 34px 12px">' +
-    head + top + spectrum + mid + program + status + foot +
+    head + top + spectrum + mid + status + foot +
     '<div style="page-break-before:always;height:18px;font-size:1px">&nbsp;</div>' + resp + detailCard + '</td></tr></table></body></html>';
 }
 

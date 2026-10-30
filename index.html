@@ -771,32 +771,26 @@ function pdfHtml() {
         <ul class="ring">${(STAGE_STRATEGY[R.stageKey] || []).map(x => `<li>${x}</li>`).join("")}</ul>
       </section>
     </div>
-    <section class="card"><h2>추천 프로그램 <em>PROGRAM</em></h2>
-      <div class="prog"><div class="pl"><b class="pname">${R.plan.name}</b>
-        <div class="kv"><span>월 납부</span><b>${R.plan.monthly}</b></div><div class="kv"><span>총액</span><b>${R.plan.total}</b></div><p class="mono vat">VAT 별도, 무이자 12개월</p></div>
-        <p class="why">${R.plan.why}</p>
-        <ul class="chk">${R.plan.items.map(x => `<li>${x}</li>`).join("")}</ul></div>
+    <section class="card"><h2>응답 문항 12 <em>RESPONSES</em></h2>
+      <table class="resp"><thead><tr><th style="width:96px">영역</th><th>문항</th><th style="width:34px;text-align:center">점수</th><th style="width:170px">응답</th></tr></thead><tbody>
+      ${AXES.map(a => byKey[a.name].qa.map((x, i) => `<tr class="${i === 2 ? "end" : ""}">${i === 0 ? `<td rowspan="3" class="area">${a.name}</td>` : ""}<td>${x.q}</td><td class="sc mono ${x.s !== null && x.s <= 1 ? "red" : ""}">${x.s ?? "-"}</td><td class="ans">${x.a}</td></tr>`).join("")).join("")}
+      </tbody></table>
+    </section>
+  </div>`;
+  const page2 = `<div class="pg">
+    <header><div><b class="logo">제-베</b><span>취업/이직 미니 진단</span></div><span class="mono">${esc(state.name)}님 | 상담 준비용</span></header>
+    <section class="card"><h2>축별 상세 진단 <em>DETAIL</em></h2>
+      ${R.axes.map(a => { const c = a.score < 45 ? "red" : a.score >= 75 ? "green" : "navy"; return `<div class="det">
+        <div class="dh"><b>${a.name}</b><strong class="${c}">${a.score}<small>점</small></strong><span class="pill ${c}">${a.verdict}</span><span class="side">${a.side}, ${a.strength}</span></div>
+        <div class="dbar"><i class="${c}" style="width:${Math.max(2, a.score)}%"></i></div>
+        <dl><div><dt>진단</dt><dd>${a.flag}</dd></div><div><dt>함께 볼 부분</dt><dd>${a.point}</dd></div><div><dt>상담 의제</dt><dd>${(a.locked || []).join(", ")}</dd></div></dl>
+  </div>`; }).join("")}
     </section>
     <section class="card st"><h2>상담 준비 정보 <em>STATUS</em></h2>
       <div class="stat"><span class="gbadge g${grade === "-" ? "none" : grade.replace("-", "m")}">${grade}</span><div><small>금액 인지</small><b>${esc(row["금액 인지"] || "응답 전")}</b></div><div class="sep"><small>맞춤 상담 진행 확인</small><b>${esc(row["맞춤 상담 확인"] || "미확인")}</b></div></div>
       <p class="note sm">A 참여 고려, B 상담 후 판단, B- 가족 상의 필요, C 현재 고려 어려움 (사전 설문과 같은 기준)</p>
     </section>
     <footer><span>신청 DB <b>${esc(R.db || "-")}</b>&nbsp;&nbsp; 검사 일시 <b>${esc(row["제출일시"])}</b></span><span class="mono">zero-base | 취업정보회사</span></footer>
-  </div>`;
-  const page2 = `<div class="pg">
-    <header><div><b class="logo">제-베</b><span>취업/이직 미니 진단</span></div><span class="mono">${esc(state.name)}님 | 상담 준비용</span></header>
-    <section class="card"><h2>응답 문항 12 <em>RESPONSES</em></h2>
-      <table class="resp"><thead><tr><th style="width:96px">영역</th><th>문항</th><th style="width:34px;text-align:center">점수</th><th style="width:170px">응답</th></tr></thead><tbody>
-      ${AXES.map(a => byKey[a.name].qa.map((x, i) => `<tr class="${i === 2 ? "end" : ""}">${i === 0 ? `<td rowspan="3" class="area">${a.name}</td>` : ""}<td>${x.q}</td><td class="sc mono ${x.s !== null && x.s <= 1 ? "red" : ""}">${x.s ?? "-"}</td><td class="ans">${x.a}</td></tr>`).join("")).join("")}
-      </tbody></table>
-    </section>
-    <section class="card"><h2>축별 상세 진단 <em>DETAIL</em></h2>
-      ${R.axes.map(a => { const c = a.score < 45 ? "red" : a.score >= 75 ? "green" : "navy"; return `<div class="det">
-        <div class="dh"><b>${a.name}</b><strong class="${c}">${a.score}<small>점</small></strong><span class="pill ${c}">${a.verdict}</span><span class="side">${a.side}, ${a.strength}</span></div>
-        <div class="dbar"><i class="${c}" style="width:${Math.max(2, a.score)}%"></i></div>
-        <dl><div><dt>진단</dt><dd>${a.flag}</dd></div><div><dt>함께 볼 부분</dt><dd>${a.point}</dd></div><div><dt>상담 의제</dt><dd>${(a.locked || []).join(", ")}</dd></div></dl>
-      </div>`; }).join("")}
-    </section>
   </div>`;
   return { page1, page2 };
 }
@@ -1264,9 +1258,16 @@ function renderProgram() {
   const total = Math.round(scores.reduce((s, x) => s + x.score, 0) / scores.length);
   const gaps = scores.filter(x => !x.high), rp = recPlan(gaps, total);
   app.innerHTML = `
-    <div class="area-intro"><span class="eyebrow">마지막 질문</span><h2>상담 전에 하나만 더 여쭤볼게요</h2><p class="muted">프로그램 안내는 예약하신 상담에서 진단지와 함께 진행돼요.</p></div>
+    <div class="area-intro"><span class="eyebrow">추천 프로그램</span><h2>${esc(state.name || "고객")}님께 맞는 프로그램</h2><p class="muted">추천 프로그램에 대한 안내도 예약하신 상담에서 함께 진행돼요.</p></div>
+    <div class="plans2">${PLANS.map(p => `<section class="plan2 ${p.key}">
+      <div class="plan2-head"><span class="plan2-mark">${p.name[0] === "노" ? "N" : "P"}</span><span class="plan2-name">${p.name} 서비스</span>${p.key === rp.key ? `<span class="plan2-rec">${esc(state.name || "고객")}님 추천</span>` : ""}
+        <div class="plan2-price"><small>무이자 12개월 할부</small><b>월 ${p.monthly}</b><span>총 프로그램 비용 ${p.total} (VAT 별도)</span></div></div>
+      <ul class="plan2-items">${p.items.map(t => `<li>${t}</li>`).join("")}${p.plus.map(t => `<li class="plus">${t}</li>`).join("")}</ul>
+      ${p.key === rp.key ? `<p class="plan2-why">${rp.why}</p>` : ""}
+    </section>`).join("")}</div>
     <section class="card">
-      <p class="q-title" style="margin-top:0">${PRICE_Q}</p>
+      <span class="eyebrow">마지막 질문</span>
+      <p class="q-title" style="margin-top:6px">${PRICE_Q}</p>
       <div class="opts">${PRICE_OPTS.map(([g, t], i) => `<button type="button" class="opt" data-p="${i}" aria-pressed="${state.price === i}">${t}</button>`).join("")}</div>
     </section>`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">제출하기</button><button type="button" class="btn sub" id="back">결과지 다시 보기</button>`;
