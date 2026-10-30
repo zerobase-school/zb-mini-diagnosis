@@ -887,7 +887,7 @@ function loadPdfLibs() {
   pdfLibs = Promise.all([
     load("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
     load("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
-  ]);
+  ]).catch(e => { pdfLibs = null; throw new Error("PDF 도구 불러오기 실패"); });
   return pdfLibs;
 }
 async function makePdfBase64() {
@@ -911,7 +911,7 @@ async function makePdfBase64() {
     const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true });
     const pages = doc.querySelectorAll(".pg");
     for (let i = 0; i < pages.length; i++) {
-      const canvas = await window.html2canvas(pages[i], { scale: 2, backgroundColor: "#f3f4f9", logging: false, windowWidth: 794 });
+      const canvas = await window.html2canvas(pages[i], { scale: 1.7, backgroundColor: "#f3f4f9", logging: false, windowWidth: 794, useCORS: true });
       if (i) pdf.addPage();
       pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, 297);
     }
@@ -923,10 +923,12 @@ async function makePdfBase64() {
 let lastSent = null;
 let submitted = false;
 function submitRow(pdf) {
+  if (!pdf && !state.pdfNote) state.pdfNote = "서버 대체: 금액 질문 전 이탈";
   if (submitted) return;
   const row = buildRow(); lastSent = row;
   const payload = Object.assign({}, row, { _report: JSON.stringify(buildReport()) });
   if (pdf) payload._pdf = pdf;
+  payload["PDF 생성"] = state.pdfNote || "";
   if (!SHEET_ENDPOINT) { toast("시연 모드라 시트로 보내지 않았어요. 시연 메뉴에서 보낼 데이터를 볼 수 있어요."); return; }
   submitted = true;
   const body = JSON.stringify(payload);
@@ -1239,6 +1241,7 @@ function renderReport() {
 
     <p class="foot">12개 자가 응답 문항으로 산출한 참고용 진단이에요. 유형은 축별 점수 56점 이상이면 앞 글자, 미만이면 뒤 글자로 정해요. 판정 기준은 45점 미만 보완 필요, 45~74점 표준, 75점 이상 우수예요.</p>`;
   state.reachedReport = true;
+  loadPdfLibs().catch(() => {});
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">네, 확인했어요</button>`;
   $("go").addEventListener("click", () => { state.consultOk = true; go("program"); });
 }
@@ -1277,7 +1280,9 @@ function renderProgram() {
     g.disabled = true;
     showLoader("결과지를 만들고 있어요", ["진단 결과를 정리하는 중", "결과지를 그리는 중", "상담 담당자에게 전달하는 중"]);
     let pdf = null;
-    try { pdf = await Promise.race([makePdfBase64(), new Promise(r => setTimeout(() => r(null), 15000))]); } catch (e) { pdf = null; }
+    const t0 = Date.now();
+    try { pdf = await Promise.race([makePdfBase64(), new Promise((_, no) => setTimeout(() => no(new Error("시간 초과 30초")), 30000))]); state.pdfNote = `페이지 생성 (${((Date.now() - t0) / 1000).toFixed(1)}초)`; }
+    catch (e) { pdf = null; state.pdfNote = "서버 대체: " + String(e && e.message || e).slice(0, 80); }
     submitRow(pdf); hideLoader(); go("done");
   });
   $("back").addEventListener("click", () => go("report"));
