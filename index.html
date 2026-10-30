@@ -1264,16 +1264,9 @@ function renderProgram() {
   const total = Math.round(scores.reduce((s, x) => s + x.score, 0) / scores.length);
   const gaps = scores.filter(x => !x.high), rp = recPlan(gaps, total);
   app.innerHTML = `
-    <div class="area-intro"><span class="eyebrow">추천 프로그램</span><h2>${esc(state.name || "고객")}님께 맞는 프로그램</h2><p class="muted">추천 프로그램에 대한 안내도 예약하신 상담에서 함께 진행돼요.</p></div>
-    <div class="plans2">${PLANS.map(p => `<section class="plan2 ${p.key}">
-      <div class="plan2-head"><span class="plan2-mark">${p.name[0] === "노" ? "N" : "P"}</span><span class="plan2-name">${p.name} 서비스</span>${p.key === rp.key ? `<span class="plan2-rec">${esc(state.name || "고객")}님 추천</span>` : ""}
-        <div class="plan2-price"><small>무이자 12개월 할부</small><b>월 ${p.monthly}</b><span>총 프로그램 비용 ${p.total} (VAT 별도)</span></div></div>
-      <ul class="plan2-items">${p.items.map(t => `<li>${t}</li>`).join("")}${p.plus.map(t => `<li class="plus">${t}</li>`).join("")}</ul>
-      ${p.key === rp.key ? `<p class="plan2-why">${rp.why}</p>` : ""}
-    </section>`).join("")}</div>
+    <div class="area-intro"><span class="eyebrow">마지막 질문</span><h2>상담 전에 하나만 더 여쭤볼게요</h2><p class="muted">프로그램 안내는 예약하신 상담에서 진단지와 함께 진행돼요.</p></div>
     <section class="card">
-      <span class="eyebrow">마지막 질문</span>
-      <p class="q-title" style="margin-top:6px">${PRICE_Q}</p>
+      <p class="q-title" style="margin-top:0">${PRICE_Q}</p>
       <div class="opts">${PRICE_OPTS.map(([g, t], i) => `<button type="button" class="opt" data-p="${i}" aria-pressed="${state.price === i}">${t}</button>`).join("")}</div>
     </section>`;
   bottom.innerHTML = `<button type="button" class="btn primary" id="go">제출하기</button><button type="button" class="btn sub" id="back">결과지 다시 보기</button>`;
