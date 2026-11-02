@@ -100,7 +100,7 @@ function savePdf(bytes, d) {
   const name = '미니진단_' + (d['이름'] || '이름없음') + '_' + String(d['연락처'] || '').replace(/\D/g, '').slice(-4) + '_' +
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
   const file = getFolder().createFile(Utilities.newBlob(bytes, 'application/pdf', name));
-  try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  shareFile(file);
   return file.getUrl();
 }
 // PDF를 90KB씩 나눠 6시간 동안 캐시에 보관
@@ -280,7 +280,7 @@ function makePdf(d, detail) {
     Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd_HHmm') + '.pdf';
   const blob = htmlToPdf(html).setName(name);
   const file = getFolder().createFile(blob);
-  try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  shareFile(file);
   return file.getUrl();
 }
 
@@ -298,6 +298,20 @@ function htmlToPdf(html) {
     } catch (e) {}
   }
   return src.getAs('application/pdf');
+}
+
+// 링크가 있으면 누구나 볼 수 있게 (회사 정책으로 막혀 있으면 회사 계정만 보기로)
+function shareFile(file) {
+  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); return true; }
+  catch (e) { try { file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW); } catch (e2) {} return false; }
+}
+
+// 편집기에서 한 번 실행: 이미 만들어진 결과지도 누구나 볼 수 있게 바꿈
+function shareAllPdfs() {
+  const it = getFolder().getFiles();
+  let ok = 0, fail = 0;
+  while (it.hasNext()) { if (shareFile(it.next())) ok++; else fail++; }
+  Logger.log('공개 링크로 변경 ' + ok + '개' + (fail ? ', 실패 ' + fail + '개 (회사 공유 정책 확인 필요)' : ''));
 }
 
 function getFolder() {
