@@ -156,8 +156,10 @@ function makePendingPdfs() {
 }
 
 /* ---------- 일정표 고객 메모에 결과지 링크 넣기 ---------- */
-// 일정표에서 고객 칸의 메모 첫 줄(연락처)로 고객을 찾아, 메모 맨 아래에 진단 요약과 결과지 링크를 붙인다.
-// 이미 붙인 적이 있으면 그 부분만 새 내용으로 바꾼다. 메모의 나머지 내용과 칸 글자는 건드리지 않는다.
+// 일정표 고객 칸 메모의 연락처(일정표 자동화가 첫 줄에 적는 번호)로 고객을 찾아,
+// 메모 아래에 [미니 진단] 요약과 결과지 링크를 붙인다. 칸 글자, 색, 메모의 다른 내용은 건드리지 않는다.
+// 일정표 자동화의 보이지 않는 추적 정보(⁣ 사이 글자)는 늘 메모 맨 끝에 그대로 둔다.
+// 일정표 자동화가 칸을 옮기거나 다시 만들며 메모가 바뀌면, 제출 후 14일 동안 1분마다 확인해 다시 붙인다.
 const SCHEDULE_ID = '16ic7PCfTJZXHAy4XirlfpnMM47JU6gXmL9ok3lprHMs'; // [취업정보회사] 일정표
 const SCHEDULE_TAB = '일정표';
 const SCHEDULE_SCAN_ROWS = 500;      // 아래에서부터 이만큼만 찾음 (최근 몇 주)
@@ -165,6 +167,8 @@ const MEMO_COL = '일정표 메모';
 const MEMO_WAIT = '대기';
 const MEMO_TAG = '[미니 진단]';
 const MEMO_GIVE_UP_DAYS = 7;         // 이 기간 안에 일정표에서 못 찾으면 그만 찾음
+const MEMO_WATCH_DAYS = 14;          // 붙인 뒤에도 이 기간 동안은 지워졌는지 확인해 다시 붙임
+const ZW_MARK = '⁣';
 
 function linkPendingMemos(sheet) {
   const headers = getHeaders(sheet);
@@ -173,74 +177,92 @@ function linkPendingMemos(sheet) {
   const n = sheet.getLastRow() - 1;
   const values = sheet.getRange(2, 1, n, headers.length).getValues();
   const formulas = sheet.getRange(2, pdfIdx + 1, n, 1).getFormulas();
+  const props = PropertiesService.getScriptProperties();
   const todo = [];
   for (let i = 0; i < n; i++) {
-    if (String(values[i][memoIdx]).indexOf(MEMO_WAIT) !== 0) continue;
+    const status = String(values[i][memoIdx]);
+    if (status.indexOf(MEMO_WAIT) !== 0 && status.indexOf('연결됨') !== 0) continue;
+    const id = String(values[i][headers.indexOf('응답 ID')] || '');
+    if (!id) continue;
+    let since = Number(props.getProperty('m_' + id) || 0);
+    if (!since) {
+      if (status.indexOf('연결됨') === 0) continue;           // 확인 기간이 끝난 줄
+      since = Date.now(); props.setProperty('m_' + id, String(since));
+    }
     const m = String(formulas[i][0]).match(/HYPERLINK\("([^"]+)"/);
-    if (!m) continue; // 결과지가 아직 없음
-    todo.push({ i: i, url: m[1] });
+    if (!m) continue;                                          // 결과지가 아직 없음
+    todo.push({ i: i, id: id, url: m[1], since: since, status: status });
   }
   if (!todo.length) return;
 
   const sh = SpreadsheetApp.openById(SCHEDULE_ID).getSheetByName(SCHEDULE_TAB);
   const last = sh.getLastRow(), start = Math.max(1, last - SCHEDULE_SCAN_ROWS + 1);
   const range = sh.getRange(start, 1, last - start + 1, sh.getLastColumn());
-  const notes = range.getNotes(), shown = range.getDisplayValues();
-  const props = PropertiesService.getScriptProperties();
+  const notes = range.getNotes(), shown = range.getDisplayValues(), lines = range.getFontLines();
+
+  // 메모 속 연락처 → 칸 목록 (일정표 자동화와 같은 방식으로 번호를 읽음)
+  const byPhone = {};
+  for (let r = 0; r < notes.length; r++) for (let c = 1; c < notes[r].length; c++) {
+    const note = notes[r][c];
+    if (!note || !/\((방문|화상)\)/.test(shown[r][c])) continue;
+    const ph = (note.match(/01\d[-\s]?\d{3,4}[-\s]?\d{4}/) || [''])[0].replace(/\D/g, '');
+    if (!ph) continue;
+    const cancelled = lines[r][c] === 'line-through' || shown[r][c].indexOf('취소') !== -1;
+    (byPhone[ph] = byPhone[ph] || []).push({ r: r, c: c, cancelled: cancelled });
+  }
 
   todo.forEach(function (t) {
     const d = {};
     headers.forEach(function (h, j) { d[h] = values[t.i][j]; });
     const phone = String(d['연락처'] || '').replace(/\D/g, '');
     const cell = sheet.getRange(t.i + 2, memoIdx + 1);
-    if (phone.length < 10) { cell.setValue('연락처 없음'); return; }
+    const setStatus = function (v) { if (v !== t.status) cell.setValue(v); };
+    const age = Date.now() - t.since;
+    if (phone.length < 10) { setStatus('연락처 없음'); props.deleteProperty('m_' + t.id); return; }
 
-    // 메모 첫 줄의 연락처가 같은 칸 (취소된 칸은 다른 칸이 없을 때만)
-    const hits = [];
-    for (let r = 0; r < notes.length; r++) for (let c = 0; c < notes[r].length; c++) {
-      const note = notes[r][c];
-      if (!note) continue;
-      if (note.split('\n')[0].replace(/\D/g, '') !== phone) continue;
-      hits.push({ r: r, c: c, cancelled: /^\s*취소/.test(shown[r][c]) });
-    }
+    const hits = byPhone[phone] || [];
     const live = hits.filter(function (h) { return !h.cancelled; });
-    const targets = live.length ? live : hits.slice(-1);
-
+    const targets = live.length ? live : hits.slice(-1);       // 취소된 칸뿐이면 마지막 칸 하나에만
     if (!targets.length) {
-      const since = Number(props.getProperty('m_' + d['응답 ID']) || 0);
-      if (since && Date.now() - since > MEMO_GIVE_UP_DAYS * 864e5) { cell.setValue('일정표에서 못 찾음'); props.deleteProperty('m_' + d['응답 ID']); }
-      else cell.setValue(MEMO_WAIT + ' (일정표에 아직 없음)');
+      if (t.status.indexOf('연결됨') === 0) {                  // 붙였던 칸이 사라짐 (일정표에서 지움)
+        if (age > MEMO_WATCH_DAYS * 864e5) props.deleteProperty('m_' + t.id);
+        return;
+      }
+      if (age > MEMO_GIVE_UP_DAYS * 864e5) { setStatus('일정표에서 못 찾음'); props.deleteProperty('m_' + t.id); }
+      else setStatus(MEMO_WAIT + ' (일정표에 아직 없음)');
       return;
     }
     const block = memoBlock(d, t.url);
     const where = targets.map(function (h) {
-      const target = range.getCell(h.r + 1, h.c + 1);
-      target.setNote(withBlock(notes[h.r][h.c], block));
-      return shown[h.r][0] ? shown[h.r][0] + ' 칸' : target.getA1Notation();
+      const now = notes[h.r][h.c], next = withBlock(now, block);
+      if (next !== now) { range.getCell(h.r + 1, h.c + 1).setNote(next); notes[h.r][h.c] = next; }
+      return shown[h.r][0] ? shown[h.r][0] + ' 칸' : range.getCell(h.r + 1, h.c + 1).getA1Notation();
     });
-    cell.setValue('연결됨 (' + where.join(', ') + ')');
-    props.deleteProperty('m_' + d['응답 ID']);
+    setStatus('연결됨 (' + where.join(', ') + ')');
+    if (age > MEMO_WATCH_DAYS * 864e5) props.deleteProperty('m_' + t.id);
   });
 }
 
 function memoBlock(d, url) {
-  const lines = [MEMO_TAG + ' ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'M/d HH:mm') + ' 제출'];
+  const when = d['제출일시'] instanceof Date ? Utilities.formatDate(d['제출일시'], 'Asia/Seoul', 'M/d HH:mm') : String(d['제출일시'] || '');
+  const out = [MEMO_TAG + (when ? ' ' + when + ' 제출' : '')];
   const type = [d['유형 코드'], d['유형 이름']].filter(function (x) { return x !== '' && x != null; }).join(' ');
-  if (type) lines.push('유형: ' + type + (d['종합 점수'] !== '' && d['종합 점수'] != null ? ' / 종합 ' + d['종합 점수'] + '점' : ''));
-  if (d['가장 큰 고민']) lines.push('고민: ' + d['가장 큰 고민']);
-  if (d['가장 약한 축']) lines.push('약한 축: ' + d['가장 약한 축']);
-  if (d['금액 인지 구분']) lines.push('금액 인지: ' + d['금액 인지 구분']);
-  lines.push('결과지: ' + url);
-  return lines.join('\n');
+  if (type) out.push('유형: ' + type + (d['종합 점수'] !== '' && d['종합 점수'] != null ? ' / 종합 ' + d['종합 점수'] + '점' : ''));
+  if (d['가장 큰 고민']) out.push('고민: ' + d['가장 큰 고민']);
+  if (d['가장 약한 축']) out.push('약한 축: ' + d['가장 약한 축']);
+  if (d['금액 인지 구분']) out.push('금액 인지: ' + d['금액 인지 구분']);
+  out.push('결과지: ' + url);
+  return out.join('\n');
 }
 
-// 기존 메모 뒤에 붙임. 예전에 붙인 [미니 진단] 부분은 교체, 메모 끝의 보이지 않는 문자는 그대로 맨 끝에 둠
+// 메모 뒤에 붙임. 예전에 붙인 [미니 진단] 부분은 교체, 일정표 자동화의 추적 정보는 맨 끝에 그대로
 function withBlock(note, block) {
-  const tail = (note.match(/[​-‍⁠⁣﻿]+$/) || [''])[0];
-  let body = note.slice(0, note.length - tail.length);
-  const at = body.indexOf(MEMO_TAG);
-  if (at > -1) body = body.slice(0, at);
-  return body.replace(/\s+$/, '') + '\n\n' + block + tail;
+  let s = String(note || ''), link = '';
+  const a = s.indexOf(ZW_MARK), b = a >= 0 ? s.indexOf(ZW_MARK, a + 1) : -1;
+  if (a >= 0 && b > a) { link = s.slice(a, b + 1); s = s.slice(0, a) + s.slice(b + 1); }
+  const at = s.indexOf(MEMO_TAG);
+  if (at > -1) s = s.slice(0, at);
+  return s.replace(/\s+$/, '') + '\n\n' + block + link;
 }
 
 // 편집기에서 한 번만 실행: 1분마다 makePendingPdfs 자동 실행 등록 (이미 있으면 다시 만들지 않음)
