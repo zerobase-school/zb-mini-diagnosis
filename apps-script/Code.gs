@@ -16,6 +16,9 @@
  * - 1분마다 도는 자동 실행(makePendingPdfs)이 PDF 결과지를 만들어 드라이브 "미니 진단 결과지" 폴더에 저장하고 링크로 바꾼다.
  * - 시트 첫 행의 열 이름에 맞춰 한 줄을 추가한다. PDF 링크는 "연락처" 바로 옆 열에 들어간다.
  * - 시트에 없는 항목이 오면 맨 오른쪽에 열을 새로 만든다.
+ * - 결과지 링크가 생기면 같은 자동 실행이 [취업정보회사] 일정표에서 연락처가 같은 고객 칸을 찾아
+ *   메모 맨 아래에 [미니 진단] 요약과 결과지 링크를 붙이고, 응답 시트 "일정표 메모" 열에 결과를 적는다.
+ *   일정표에 아직 고객이 없으면 7일 동안 1분마다 다시 찾는다.
  */
 
 const SHEET_ID = '1YS72FDuRNgBQVu9uD3x_ZZbTTTndEd4Vef1BUha7k7A'; // [취업정보회사] 미니 진단 응답
@@ -38,6 +41,8 @@ function doPost(e) {
     data['응답 ID'] = Utilities.getUuid().slice(0, 8);
     if (detail) PropertiesService.getScriptProperties().setProperty('r_' + data['응답 ID'], detail);
     data[PDF_COL] = PDF_PENDING;
+    data[MEMO_COL] = MEMO_WAIT; // 자동 실행이 일정표 고객 메모에 결과지 링크를 넣음
+    PropertiesService.getScriptProperties().setProperty('m_' + data['응답 ID'], String(Date.now()));
     if (pdfB64) {
       try {
         data[PDF_COL] = '=HYPERLINK("' + savePdf(Utilities.base64Decode(pdfB64), data) + '","PDF 보기")';
@@ -144,9 +149,98 @@ function makePendingPdfs() {
       }
       made++;
     }
+    try { linkPendingMemos(sheet); } catch (err) { Logger.log('일정표 메모 연결 실패: ' + err); }
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ---------- 일정표 고객 메모에 결과지 링크 넣기 ---------- */
+// 일정표에서 고객 칸의 메모 첫 줄(연락처)로 고객을 찾아, 메모 맨 아래에 진단 요약과 결과지 링크를 붙인다.
+// 이미 붙인 적이 있으면 그 부분만 새 내용으로 바꾼다. 메모의 나머지 내용과 칸 글자는 건드리지 않는다.
+const SCHEDULE_ID = '16ic7PCfTJZXHAy4XirlfpnMM47JU6gXmL9ok3lprHMs'; // [취업정보회사] 일정표
+const SCHEDULE_TAB = '일정표';
+const SCHEDULE_SCAN_ROWS = 500;      // 아래에서부터 이만큼만 찾음 (최근 몇 주)
+const MEMO_COL = '일정표 메모';
+const MEMO_WAIT = '대기';
+const MEMO_TAG = '[미니 진단]';
+const MEMO_GIVE_UP_DAYS = 7;         // 이 기간 안에 일정표에서 못 찾으면 그만 찾음
+
+function linkPendingMemos(sheet) {
+  const headers = getHeaders(sheet);
+  const memoIdx = headers.indexOf(MEMO_COL), pdfIdx = headers.indexOf(PDF_COL);
+  if (memoIdx === -1 || pdfIdx === -1 || sheet.getLastRow() < 2) return;
+  const n = sheet.getLastRow() - 1;
+  const values = sheet.getRange(2, 1, n, headers.length).getValues();
+  const formulas = sheet.getRange(2, pdfIdx + 1, n, 1).getFormulas();
+  const todo = [];
+  for (let i = 0; i < n; i++) {
+    if (String(values[i][memoIdx]).indexOf(MEMO_WAIT) !== 0) continue;
+    const m = String(formulas[i][0]).match(/HYPERLINK\("([^"]+)"/);
+    if (!m) continue; // 결과지가 아직 없음
+    todo.push({ i: i, url: m[1] });
+  }
+  if (!todo.length) return;
+
+  const sh = SpreadsheetApp.openById(SCHEDULE_ID).getSheetByName(SCHEDULE_TAB);
+  const last = sh.getLastRow(), start = Math.max(1, last - SCHEDULE_SCAN_ROWS + 1);
+  const range = sh.getRange(start, 1, last - start + 1, sh.getLastColumn());
+  const notes = range.getNotes(), shown = range.getDisplayValues();
+  const props = PropertiesService.getScriptProperties();
+
+  todo.forEach(function (t) {
+    const d = {};
+    headers.forEach(function (h, j) { d[h] = values[t.i][j]; });
+    const phone = String(d['연락처'] || '').replace(/\D/g, '');
+    const cell = sheet.getRange(t.i + 2, memoIdx + 1);
+    if (phone.length < 10) { cell.setValue('연락처 없음'); return; }
+
+    // 메모 첫 줄의 연락처가 같은 칸 (취소된 칸은 다른 칸이 없을 때만)
+    const hits = [];
+    for (let r = 0; r < notes.length; r++) for (let c = 0; c < notes[r].length; c++) {
+      const note = notes[r][c];
+      if (!note) continue;
+      if (note.split('\n')[0].replace(/\D/g, '') !== phone) continue;
+      hits.push({ r: r, c: c, cancelled: /^\s*취소/.test(shown[r][c]) });
+    }
+    const live = hits.filter(function (h) { return !h.cancelled; });
+    const targets = live.length ? live : hits.slice(-1);
+
+    if (!targets.length) {
+      const since = Number(props.getProperty('m_' + d['응답 ID']) || 0);
+      if (since && Date.now() - since > MEMO_GIVE_UP_DAYS * 864e5) { cell.setValue('일정표에서 못 찾음'); props.deleteProperty('m_' + d['응답 ID']); }
+      else cell.setValue(MEMO_WAIT + ' (일정표에 아직 없음)');
+      return;
+    }
+    const block = memoBlock(d, t.url);
+    const where = targets.map(function (h) {
+      const target = range.getCell(h.r + 1, h.c + 1);
+      target.setNote(withBlock(notes[h.r][h.c], block));
+      return shown[h.r][0] ? shown[h.r][0] + ' 칸' : target.getA1Notation();
+    });
+    cell.setValue('연결됨 (' + where.join(', ') + ')');
+    props.deleteProperty('m_' + d['응답 ID']);
+  });
+}
+
+function memoBlock(d, url) {
+  const lines = [MEMO_TAG + ' ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'M/d HH:mm') + ' 제출'];
+  const type = [d['유형 코드'], d['유형 이름']].filter(function (x) { return x !== '' && x != null; }).join(' ');
+  if (type) lines.push('유형: ' + type + (d['종합 점수'] !== '' && d['종합 점수'] != null ? ' / 종합 ' + d['종합 점수'] + '점' : ''));
+  if (d['가장 큰 고민']) lines.push('고민: ' + d['가장 큰 고민']);
+  if (d['가장 약한 축']) lines.push('약한 축: ' + d['가장 약한 축']);
+  if (d['금액 인지 구분']) lines.push('금액 인지: ' + d['금액 인지 구분']);
+  lines.push('결과지: ' + url);
+  return lines.join('\n');
+}
+
+// 기존 메모 뒤에 붙임. 예전에 붙인 [미니 진단] 부분은 교체, 메모 끝의 보이지 않는 문자는 그대로 맨 끝에 둠
+function withBlock(note, block) {
+  const tail = (note.match(/[​-‍⁠⁣﻿]+$/) || [''])[0];
+  let body = note.slice(0, note.length - tail.length);
+  const at = body.indexOf(MEMO_TAG);
+  if (at > -1) body = body.slice(0, at);
+  return body.replace(/\s+$/, '') + '\n\n' + block + tail;
 }
 
 // 편집기에서 한 번만 실행: 1분마다 makePendingPdfs 자동 실행 등록 (이미 있으면 다시 만들지 않음)
