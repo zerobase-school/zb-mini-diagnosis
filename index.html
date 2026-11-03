@@ -1358,7 +1358,11 @@ async function regenAll() {
       regenState(r);
       const pdf = await makePdfBase64();
       const body = JSON.stringify({ _regen: REGEN_KEY, "응답 ID": r["응답 ID"], _pdf: pdf, _report: JSON.stringify(buildReport()), "PDF 생성": "재생성 (" + new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + ")" });
-      const out = await fetch(SHEET_ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).then(x => x.json()).catch(() => null);
+      let out = null;
+      for (let t = 0; t < 3 && !(out && out.ok); t++) { // 서버가 바쁘면 잠시 뒤 다시 시도
+        if (t) await new Promise(ok => setTimeout(ok, 8000));
+        out = await fetch(SHEET_ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).then(x => x.json()).catch(() => null);
+      }
       lines.push(`${r["이름"]}: ${out && out.ok ? "완료" : "저장 실패 " + ((out && out.error) || "")}`);
     } catch (e) { lines.push(`${r["이름"]}: 실패 ${String(e && e.message || e).slice(0, 60)}`); }
     log(lines.join("\n"));

@@ -30,7 +30,7 @@ const FALLBACK_WAIT_MIN = 5;           // 결과지 없이 온 응답은 5분 �
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  if (!lock.tryLock(28000)) return json({ ok: false, error: '서버가 바빠요. 잠시 뒤 다시 시도해 주세요.' });
   try {
     const data = JSON.parse(e.postData.contents);
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
