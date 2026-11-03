@@ -26,6 +26,7 @@ const SHEET_INDEX = 0;                 // 응답을 쌓을 탭 (첫 번째 탭)
 const PDF_COL = '결과지 PDF';          // PDF 링크 열 이름
 const PDF_FOLDER = '미니 진단 결과지';  // PDF를 저장할 폴더 이름 (시트와 같은 위치에 생성)
 const PDF_PENDING = '생성 중';
+const FALLBACK_WAIT_MIN = 5;           // 결과지 없이 온 응답은 5분 기다렸다가 서버가 대신 만듦
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -38,19 +39,34 @@ function doPost(e) {
     //    결과지 상세 내용(_report)은 시트 열 대신 스크립트 저장소에 잠시 보관
     const detail = data._report; delete data._report;
     const pdfB64 = data._pdf; delete data._pdf; // 진단 페이지가 만든 PDF (레퍼런스 디자인)
-    data['응답 ID'] = Utilities.getUuid().slice(0, 8);
-    if (detail) PropertiesService.getScriptProperties().setProperty('r_' + data['응답 ID'], detail);
-    data[PDF_COL] = PDF_PENDING;
-    data[MEMO_COL] = MEMO_WAIT; // 자동 실행이 일정표 고객 메모에 결과지 링크를 넣음
-    PropertiesService.getScriptProperties().setProperty('m_' + data['응답 ID'], String(Date.now()));
+    const regen = data._regen; delete data._regen;
+    const props = PropertiesService.getScriptProperties();
+    if (regen && regen !== props.getProperty('REGEN_KEY')) return json({ ok: false, error: '키가 맞지 않아요' });
+    if (!data['응답 ID']) data['응답 ID'] = 's' + Utilities.getUuid().slice(0, 8);
+    const id = String(data['응답 ID']);
+
+    // 같은 응답 ID가 이미 있으면 (중간에 나갔다 와서 제출, 결과지 다시 만들기) 그 줄을 고침
+    const existing = findRowById(sheet, id);
+    let pdfUrl = null;
     if (pdfB64) {
-      try {
-        data[PDF_COL] = '=HYPERLINK("' + savePdf(Utilities.base64Decode(pdfB64), data) + '","PDF 보기")';
-      } catch (err) {
-        // 바로 저장이 안 되면 잠시 보관했다가 자동 실행이 저장
-        stashPdf(data['응답 ID'], pdfB64);
-      }
+      try { pdfUrl = savePdf(Utilities.base64Decode(pdfB64), data); }
+      catch (err) { stashPdf(id, pdfB64); } // 바로 저장이 안 되면 잠시 보관했다가 자동 실행이 저장
     }
+    // 결과지 상세 내용은 서버가 대신 만들 때만 필요해서, 페이지가 만든 결과지가 오면 지움 (저장 공간 아끼기)
+    if (pdfUrl) { props.deleteProperty('r_' + id); props.deleteProperty('t_' + id); }
+    else if (detail) { try { props.setProperty('r_' + id, detail); } catch (e) { cleanupProps(); try { props.setProperty('r_' + id, detail); } catch (e2) {} } }
+    if (existing) {
+      if (pdfUrl) data[PDF_COL] = '=HYPERLINK("' + pdfUrl + '","PDF 보기")';
+      else if (pdfB64) data[PDF_COL] = PDF_PENDING;
+      updateRow(sheet, existing, data);
+      return json({ ok: true, updated: true });
+    }
+    if (regen) return json({ ok: false, error: '응답 ID를 찾지 못했어요' });
+
+    data[PDF_COL] = pdfUrl ? '=HYPERLINK("' + pdfUrl + '","PDF 보기")' : PDF_PENDING;
+    data[MEMO_COL] = MEMO_WAIT; // 자동 실행이 일정표 고객 메모에 결과지 링크를 넣음
+    props.setProperty('m_' + id, String(Date.now()));
+    if (!pdfB64) props.setProperty('t_' + id, String(Date.now())); // 결과지 없이 온 응답: 잠시 기다렸다가 서버가 대신 만듦
 
     // 2) 열 준비: 결과지 PDF는 연락처 바로 옆
     let headers = getHeaders(sheet);
@@ -83,6 +99,47 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// 저장 공간 정리: 1일 넘은 결과지 상세(r_), 대기 표시(t_), 15일 넘은 메모 확인 기록(m_) 삭제
+function cleanupProps() {
+  const props = PropertiesService.getScriptProperties(), all = props.getProperties(), now = Date.now();
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
+  const headers = getHeaders(sheet), idc = headers.indexOf('응답 ID'), pc = headers.indexOf(PDF_COL);
+  const linked = {};
+  if (idc > -1 && pc > -1 && sheet.getLastRow() > 1) {
+    const ids = sheet.getRange(2, idc + 1, sheet.getLastRow() - 1, 1).getValues();
+    const f = sheet.getRange(2, pc + 1, sheet.getLastRow() - 1, 1).getFormulas();
+    ids.forEach(function (r, i) { if (f[i][0]) linked[String(r[0])] = true; });
+  }
+  let n = 0;
+  Object.keys(all).forEach(function (k) {
+    const m = k.match(/^(r|t|m)_(.+)$/);
+    if (!m) return;
+    const old = m[1] === 'm' ? now - Number(all[k]) > 15 * 864e5 : linked[m[2]];
+    if (old) { props.deleteProperty(k); n++; }
+  });
+  Logger.log('정리한 항목 ' + n + '개');
+}
+
+function findRowById(sheet, id) {
+  const headers = getHeaders(sheet), c = headers.indexOf('응답 ID');
+  if (c === -1 || sheet.getLastRow() < 2) return 0;
+  const hit = sheet.getRange(2, c + 1, sheet.getLastRow() - 1, 1).createTextFinder(id).matchEntireCell(true).findNext();
+  return hit ? hit.getRow() : 0;
+}
+
+// 이미 있는 줄에서 보내온 항목만 고침 (빈 값은 덮어쓰지 않음)
+function updateRow(sheet, row, data) {
+  let headers = getHeaders(sheet);
+  Object.keys(data).forEach(function (key) {
+    const v = data[key];
+    if (v === undefined || v === null || v === '') return;
+    let c = headers.indexOf(key);
+    if (c === -1) { headers.push(key); c = headers.length - 1; sheet.getRange(1, c + 1).setValue(key); }
+    const cell = sheet.getRange(row, c + 1);
+    if (String(v).charAt(0) === '=') cell.setFormula(v); else cell.setValue(v);
+  });
 }
 
 function getHeaders(sheet) {
@@ -133,6 +190,9 @@ function makePendingPdfs() {
     for (let i = 0; i < values.length && made < 20; i++) {
       const cell = String(values[i][pdfIdx]);
       if (formulas[i][0] || !(cell === PDF_PENDING || cell.indexOf('PDF 생성 실패') === 0)) continue;
+      const rid = String(values[i][headers.indexOf('응답 ID')] || '');
+      const waitFrom = Number(PropertiesService.getScriptProperties().getProperty('t_' + rid) || 0);
+      if (waitFrom && Date.now() - waitFrom < FALLBACK_WAIT_MIN * 60000) continue; // 고객이 돌아와 제출할 시간을 줌
       const data = {};
       headers.forEach(function (h, j) { const v = values[i][j]; data[h] = v instanceof Date ? Utilities.formatDate(v, 'Asia/Seoul', 'yyyy-MM-dd HH:mm') : v; });
       const target = sheet.getRange(i + 2, pdfIdx + 1);
@@ -143,7 +203,7 @@ function makePendingPdfs() {
         const stashed = takePdf(data['응답 ID']);
         const url = stashed ? savePdf(Utilities.base64Decode(stashed), data) : makePdf(data, detail);
         target.setFormula('=HYPERLINK("' + url + '","PDF 보기")');
-        props.deleteProperty(key);
+        props.deleteProperty('t_' + rid); props.deleteProperty(key);
       } catch (err) {
         target.setValue('PDF 생성 실패: ' + String(err));
       }
@@ -551,7 +611,7 @@ function cardHtml(d, r) {
     '<table style="' + T + '"><tr><td style="font-size:9px;color:' + INK3 + '">신청 DB <span style="color:' + INK2 + '">' + esc(r.db || '-') + '</span>&nbsp;&nbsp;&nbsp; 검사 일시 <span style="color:' + INK2 + '">' + esc(d['제출일시']) + '</span></td>' +
     '<td style="text-align:right;' + MONO + 'font-size:9px;color:' + INK3 + '">zero-base | 취업정보회사</td></tr></table>';
 
-  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
     '@page{size:A4;margin:0}html,body{margin:0;background:' + BG + '}body{' + F + 'color:' + INK + ';line-height:1.45}td,div,span,b{' + F + '}' +
     '</style></head><body bgcolor="' + BG + '">' +
     '<table style="' + T + '"><tr><td bgcolor="' + BG + '" style="background:' + BG + ';padding:26px 34px 12px">' +
@@ -688,7 +748,7 @@ function refHtml(d, r) {
     '<table style="' + T + '"><tr><td style="font-size:9.5px;color:' + INK3 + '">신청 DB <span style="color:' + INK2 + '">' + esc(r.db || '-') + '</span>&nbsp;&nbsp;&nbsp; 검사 일시 <span style="color:' + INK2 + '">' + esc(d['제출일시']) + '</span></td>' +
     '<td style="text-align:right;' + MONO + 'font-size:9.5px;color:' + INK3 + '">zero-base | 취업정보회사</td></tr></table>';
 
-  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
     '@page{size:A4;margin:11mm 12mm}body{' + F + 'color:' + INK + ';margin:0;line-height:1.45}td,div,span,b{' + F + '}' +
     '</style></head><body>' + head +
     '<table style="' + T + '"><tr><td style="width:64%;vertical-align:top;padding-right:22px">' + typeBlock + '</td>' +
@@ -871,7 +931,7 @@ function sheetHtml(d, r) {
     band('추천 프로그램 제공 내용', esc(r.plan.name)) +
     '<div style="font-size:9.5px;padding-top:3px">' + (r.plan.items || []).map(esc).join('  |  ') + '</div>';
 
-  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
     '@page{size:A4;margin:12mm}body{' + F + 'color:' + INK + ';margin:0;line-height:1.45}td,div,span,b{' + F + '}' +
     '</style></head><body>' +
     top +
@@ -1000,7 +1060,7 @@ function richHtml(d, r) {
       }).join('') + '</table></div>';
   }).join('');
 
-  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
     'body{' + F + 'color:' + INK + ';font-size:11px;margin:30px 36px;line-height:1.6}' +
     'td,div,span,b{' + F + '}' +
     '</style></head><body>' +
@@ -1060,7 +1120,7 @@ function reportHtml(d) {
     return '<span style="display:inline-block;width:38px;height:44px;line-height:44px;margin-right:6px;text-align:center;border:1px solid rgba(255,255,255,.35);border-radius:8px;font-size:24px;font-weight:800">' + esc(ch) + '</span>';
   }).join('');
 
-  return '<!doctype html><html><head><meta charset="utf-8"><style>' +
+  return '<!doctype html><html><head><meta charset="utf-8"><style>*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}' +
     'body{font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:' + INK + ';font-size:12px;margin:28px 34px;line-height:1.55}' +
     'h2{font-size:14px;margin:22px 0 8px;color:' + NAVY + '}' +
     '.box{border:1px solid ' + LINE + ';border-radius:10px;padding:14px 16px}' +
@@ -1102,12 +1162,37 @@ function reportHtml(d) {
  */
 function doGet(e) {
   const p = (e && e.parameter) || {};
+  if (p.mode === 'regen') return json(regenList(p.key));
   if (!p.phone) return json({ ok: true, message: '미니 진단 응답 수집 중' }); // 페이지가 열릴 때 미리 깨우는 용도로도 호출됨
   try {
     return json(lookupDb(p.phone, p.name || ''));
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
+}
+
+/* ---------- 결과지 다시 만들기 (담당자용) ---------- */
+// 편집기에서 setupRegenKey 를 한 번 실행하면 실행 로그에 링크가 나옴.
+// 그 링크를 PC 브라우저에서 열면, 서버가 대신 만든(디자인이 깨진) 결과지를 진단 페이지와 같은 디자인으로 다시 만들어 교체함
+const REGEN_PAGE = 'https://zb-mini-diagnosis.vercel.app/';
+function setupRegenKey() {
+  const props = PropertiesService.getScriptProperties();
+  let k = props.getProperty('REGEN_KEY');
+  if (!k) { k = Utilities.getUuid().replace(/-/g, '').slice(0, 16); props.setProperty('REGEN_KEY', k); }
+  Logger.log('결과지 다시 만들기 링크: ' + REGEN_PAGE + '?regen=' + k);
+}
+function regenList(key) {
+  const k = PropertiesService.getScriptProperties().getProperty('REGEN_KEY');
+  if (!k || key !== k) return { ok: false, error: '키가 맞지 않아요' };
+  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheets()[SHEET_INDEX];
+  const headers = getHeaders(sheet), gc = headers.indexOf('PDF 생성');
+  if (gc === -1 || sheet.getLastRow() < 2) return { ok: true, rows: [] };
+  const want = ['응답 ID', '제출일시', '이름', '연락처', '신청 DB', '구분', '연차', '가장 큰 고민', '맞춤 상담 확인', '금액 인지 구분'];
+  headers.forEach(function (h) { if (/ Q\d$/.test(h)) want.push(h); });
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
+  const rows = values.filter(function (r) { return String(r[gc]).indexOf('서버 대체') === 0 && r[headers.indexOf('응답 ID')]; })
+    .map(function (r) { const o = {}; want.forEach(function (h) { const j = headers.indexOf(h); if (j > -1) o[h] = r[j]; }); return o; });
+  return { ok: true, rows: rows };
 }
 
 const DB_SHEET_ID = '1e7dIDsSq_Ja4bpWOosAgnv_12SY2papfe1Z-IyqNS_4'; // [ZB] SD 2.0

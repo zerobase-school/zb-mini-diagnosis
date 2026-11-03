@@ -611,6 +611,7 @@ const PREFILL = {
 };
 const QS = new URLSearchParams(location.search);
 const LIVE = !QS.has("demo"); // 실제 배포: 주소에 ?demo=1 이 없으면 실제 진단 모드
+const REGEN_KEY = QS.get("regen") || ""; // 결과지 다시 만들기 (담당자용, ?regen=키)
 const LIVE_PROFILE = { db: QS.get("db") || "", name: QS.get("name") || "", phone: QS.get("phone") || "", suggest: -1, sample: null, purposes: [], booking: null, fields: [] };
 /* 링크로 받은 연차: ?stage=new|new2|jr|mid|sr 또는 ?exp=경력 기간 원문 (예: 5년 이상 ~ 7년 미만) */
 function stageFromLink() {
@@ -675,7 +676,7 @@ function buildRow() {
   const weak = [...scores].sort((x, y) => x.score - y.score)[0];
   const con = concernInfo(), c = code(), b = PROFILE.booking || { date: "", time: "", type: "" };
   const row = {
-    "제출일시": new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
+    "제출일시": state.submittedAt || new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
     "이름": state.name, "연락처": state.phone || PROFILE.phone || "", "신청 DB": PROFILE.db,
     "구분": state.track, "연차": stageLabel(), "상담 예약": `${b.date} ${b.time}`.trim(), "상담 형태": b.type,
     "상담 목적": PROFILE.purposes.join(", "),
@@ -731,7 +732,8 @@ function pdfHtml() {
   const R = buildReport(), row = buildRow();
   const byKey = {}; AXES.forEach(a => byKey[a.name] = R.axes.find(x => x.name === a.name));
   const w = R.axes[0];
-  const date = new Date(), ds = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+  const date = new Date(), sm = String(state.submittedAt || "").match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/);
+  const ds = sm ? `${sm[1]}.${sm[2].padStart(2, "0")}.${sm[3].padStart(2, "0")}` : `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
   const dual = a => {
     const ax = AXES.find(x => x.name === a.name), hi = a.score >= 56, strong = a.strength !== "약간 기울어짐";
     const cls = !strong ? "weak" : hi ? "hi" : "lo", s = Math.max(2, Math.min(98, a.score));
@@ -921,16 +923,17 @@ async function makePdfBase64() {
 /* ===== PDF 결과지 끝 ===== */
 
 let lastSent = null;
-let submitted = false;
-function submitRow(pdf) {
-  if (!pdf && !state.pdfNote) state.pdfNote = "서버 대체: 금액 질문 전 이탈";
-  if (submitted) return;
+let sentLeave = false, sentFinal = false;
+/* 같은 응답 ID로 보내서, 중간에 화면을 나갔다 와서 제출해도 시트에는 한 줄로 합쳐짐 */
+function submitRow(pdf, final) {
+  if (sentFinal || (!final && sentLeave)) return;
+  if (!final) state.pdfNote = "서버 대체: 금액 질문 전 이탈";
   const row = buildRow(); lastSent = row;
-  const payload = Object.assign({}, row, { _report: JSON.stringify(buildReport()) });
+  const payload = Object.assign({}, row, { "응답 ID": state.rid, _report: JSON.stringify(buildReport()) });
   if (pdf) payload._pdf = pdf;
   payload["PDF 생성"] = state.pdfNote || "";
   if (!SHEET_ENDPOINT) { toast("시연 모드라 시트로 보내지 않았어요. 시연 메뉴에서 보낼 데이터를 볼 수 있어요."); return; }
-  submitted = true;
+  if (final) sentFinal = true; else sentLeave = true;
   const body = JSON.stringify(payload);
   try {
     if (!pdf && navigator.sendBeacon && navigator.sendBeacon(SHEET_ENDPOINT, new Blob([body], { type: "text/plain;charset=utf-8" }))) return;
@@ -938,7 +941,7 @@ function submitRow(pdf) {
   try { fetch(SHEET_ENDPOINT, { method: "POST", mode: "no-cors", keepalive: !pdf, headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).catch(() => {}); } catch (e) {}
 }
 /* 결과지까지 본 뒤 금액 질문 전에 나가도 응답은 한 번 저장 */
-function submitOnLeave() { if (state.reachedReport && !submitted && LIVE) submitRow(); }
+function submitOnLeave() { if (state.reachedReport && !sentLeave && !sentFinal && LIVE && !REGEN_KEY) submitRow(null, false); }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") submitOnLeave(); });
 window.addEventListener("pagehide", submitOnLeave);
 function showRow() {
@@ -948,7 +951,7 @@ function showRow() {
   pnl.hidden = false;
 }
 
-const state = { step: "intro", reachedReport: false, consultOk: false, price: null, infoPhase: "", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
+const state = { rid: "r" + Math.random().toString(16).slice(2, 10), step: "intro", reachedReport: false, consultOk: false, price: null, infoPhase: "", area: 0, name: "", phone: "", track: "", stage: "", concern: null, answers: {}, pre: {} };
 const $ = id => document.getElementById(id);
 const app = $("app"), tabsEl = $("tabs"), bottom = $("bottom"), shell = $("app-shell");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -1283,7 +1286,7 @@ function renderProgram() {
     const t0 = Date.now();
     try { pdf = await Promise.race([makePdfBase64(), new Promise((_, no) => setTimeout(() => no(new Error("시간 초과 30초")), 30000))]); state.pdfNote = `페이지 생성 (${((Date.now() - t0) / 1000).toFixed(1)}초)`; }
     catch (e) { pdf = null; state.pdfNote = "서버 대체: " + String(e && e.message || e).slice(0, 80); }
-    submitRow(pdf); hideLoader(); go("done");
+    submitRow(pdf, true); hideLoader(); go("done");
   });
   $("back").addEventListener("click", () => go("report"));
 }
@@ -1338,9 +1341,43 @@ document.querySelectorAll("[data-profile]").forEach(b => b.addEventListener("cli
 // 시연 메뉴는 주소 끝에 ?demo=1 을 붙였을 때만 보여요
 if (!new URLSearchParams(location.search).has("demo")) mbtn.hidden = true;
 applyProfile(LIVE ? LIVE_PROFILE : PROFILES[0]);
-warmUp();
-startLookup();
-render();
+if (REGEN_KEY) regenAll(); else { warmUp(); startLookup(); render(); }
+
+/* 담당자용: 서버가 대신 만든(디자인이 깨진) 결과지를 이 브라우저에서 다시 그려서 교체 */
+async function regenAll() {
+  tabsEl.hidden = true; bottom.innerHTML = "";
+  const log = m => { app.innerHTML = `<section class="card"><h2 style="margin:0 0 10px">결과지 다시 만들기</h2><p style="white-space:pre-line;margin:0;font-size:14px;line-height:1.7">${esc(m)}</p></section>`; };
+  log("목록을 불러오는 중...");
+  let res = null;
+  try { res = await fetch(`${SHEET_ENDPOINT}?mode=regen&key=${encodeURIComponent(REGEN_KEY)}`).then(r => r.json()); } catch (e) {}
+  if (!res || !res.ok) return log("목록을 불러오지 못했어요. " + ((res && res.error) || "주소의 키를 확인해 주세요."));
+  if (!res.rows.length) return log("다시 만들 결과지가 없어요.");
+  const lines = [`대상 ${res.rows.length}건`];
+  for (const r of res.rows) {
+    try {
+      regenState(r);
+      const pdf = await makePdfBase64();
+      const body = JSON.stringify({ _regen: REGEN_KEY, "응답 ID": r["응답 ID"], _pdf: pdf, _report: JSON.stringify(buildReport()), "PDF 생성": "재생성 (" + new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }) + ")" });
+      const out = await fetch(SHEET_ENDPOINT, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body }).then(x => x.json()).catch(() => null);
+      lines.push(`${r["이름"]}: ${out && out.ok ? "완료" : "저장 실패 " + ((out && out.error) || "")}`);
+    } catch (e) { lines.push(`${r["이름"]}: 실패 ${String(e && e.message || e).slice(0, 60)}`); }
+    log(lines.join("\n"));
+  }
+  lines.push("", "끝났어요. 1~2분 뒤 일정표 메모의 결과지 링크도 새 파일로 바뀌어요."); log(lines.join("\n"));
+}
+// 시트에 남은 응답(글자)을 화면 상태로 되돌림
+function regenState(r) {
+  const track = r["구분"], st = (STAGES[track] || []).find(x => x[1] === r["연차"]);
+  const stage = st ? st[0] : "";
+  const answers = {};
+  AXES.forEach(a => { answers[a.key] = a.qs.map((q, i) => { const k = q.o.findIndex(o => o[0] === r[`${a.short} Q${i + 1}`]); return k < 0 ? null : k; }); });
+  const ci = (CONCERNS[stage] || []).findIndex(c => c[0] === r["가장 큰 고민"]);
+  const pi = PRICE_OPTS.findIndex(o => o[0] === r["금액 인지 구분"]);
+  Object.assign(LIVE_PROFILE, { db: r["신청 DB"] || "", name: r["이름"], phone: r["연락처"], fields: [] });
+  PROFILE = LIVE_PROFILE;
+  Object.assign(state, { name: r["이름"], phone: r["연락처"], track, stage, concern: ci < 0 ? null : ci, answers, pre: {},
+    price: pi < 0 ? null : pi, consultOk: r["맞춤 상담 확인"] === "확인함", submittedAt: r["제출일시"] });
+}
 </script>
 </body>
 </html>
